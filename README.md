@@ -1,2 +1,4 @@
-# mabe
-Mab Address Book Editor
+# mabctl
+
+MABCTL address book controller
+
