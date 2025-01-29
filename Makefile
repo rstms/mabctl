@@ -13,7 +13,7 @@ fmt:
 clean:
 	go clean
 
-install: build
+install: $(bin)
 	go install
 
 # install -o root -g root -m 0755 ./$(bin) /usr/local/bin/$(bin)

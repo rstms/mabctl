@@ -30,7 +30,7 @@ type AddressBook struct {
 	Description string `json:"description"`
 }
 
-func NewClient(username, password, url, cert, key string) (*Client, error) {
+func NewClient(username, password, url, cert, key string, insecure bool) (*Client, error) {
 	c := Client{username, password, url, cert, key, nil}
 
 	clientCert, err := tls.LoadX509KeyPair(cert, key)
@@ -38,7 +38,9 @@ func NewClient(username, password, url, cert, key string) (*Client, error) {
 		return nil, util.Fatalf("failed loading client certificate: %v", err)
 	}
 
-	tlsConfig := &tls.Config{Certificates: []tls.Certificate{clientCert}}
+	tlsConfig := &tls.Config{Certificates: []tls.Certificate{clientCert},
+		InsecureSkipVerify: insecure,
+	}
 	c.client = &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: tlsConfig,

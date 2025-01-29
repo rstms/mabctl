@@ -49,6 +49,7 @@ Administration tool for a baikal carddav/caldav server.
 			viper.GetString("admin_url"),
 			viper.GetString("cert"),
 			viper.GetString("key"),
+			viper.GetBool("insecure"),
 		)
 		cobra.CheckErr(err)
 		adminClient = a
@@ -94,6 +95,8 @@ func init() {
 	viper.BindPFlag("admin_password", rootCmd.PersistentFlags().Lookup("admin-password"))
 	rootCmd.PersistentFlags().String("admin-url", "", "baikalctl admin URL")
 	viper.BindPFlag("admin_url", rootCmd.PersistentFlags().Lookup("admin-url"))
+	rootCmd.PersistentFlags().Bool("insecure", false, "accept host certificate without validation")
+	viper.BindPFlag("insecure", rootCmd.PersistentFlags().Lookup("insecure"))
 }
 
 // initConfig reads in config file and ENV variables if set.
