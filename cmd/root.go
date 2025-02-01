@@ -32,7 +32,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-const Version = "0.0.3"
+const Version = "0.0.4"
 
 var cfgFile string
 var adminClient *admin.Client
