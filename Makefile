@@ -1,5 +1,7 @@
 
 bin = mabctll
+version != cat VERSION
+latest_release := $(shell gh release view --json tagName --jq .tagName)
 
 $(bin): fmt
 	fix go build
@@ -19,4 +21,16 @@ clean:
 install: $(bin)
 	go install
 
-# install -o root -g root -m 0755 ./$(bin) /usr/local/bin/$(bin)
+.release: $(bin)
+ifeq "v$(version)" "$(latest_release)"
+	@echo version $(version) is already released
+else
+	gh release create v$(version) --generate-notes --target master;
+endif
+	@touch $@
+
+latest-release:
+	@echo $(latest_release)
+
+release: .release
+
