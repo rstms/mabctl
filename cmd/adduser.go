@@ -22,9 +22,8 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // adduserCmd represents the adduser command
@@ -40,9 +39,13 @@ addresses by convention.  The display name will be visible to the user.
 		email := args[0]
 		display := args[1]
 		password := args[2]
-		status, _, err := adminClient.AddUser(email, display, password)
+		response, err := adminClient.AddUser(email, display, password)
 		cobra.CheckErr(err)
-		fmt.Println(status)
+		if viper.GetBool("verbose") {
+			PrintResponse(response)
+		} else {
+			PrintResponse(response.User)
+		}
 	},
 }
 

@@ -22,26 +22,32 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var booksCmd = &cobra.Command{
-	Use:   "books EMAIL",
+	Use:   "books USERNAME",
 	Short: "list address books",
 	Long: `
 List address boooks for a user account.
 `,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.RangeArgs(0, 1),
 	Run: func(cmd *cobra.Command, args []string) {
-		email := args[0]
-		books, _, err := adminClient.GetAddressBooks(email)
+		var email string
+		if len(args) > 0 {
+			email = args[0]
+		}
+		response, err := adminClient.GetBooks(email)
 		cobra.CheckErr(err)
-		fmt.Println(books)
+		if viper.GetBool("verbose") {
+			PrintResponse(response)
+		} else {
+			PrintResponse(response.Books)
+		}
 	},
 }
 
 func init() {
-	lsCmd.AddCommand(booksCmd)
+	rootCmd.AddCommand(booksCmd)
 }

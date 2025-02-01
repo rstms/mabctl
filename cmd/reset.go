@@ -22,8 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -34,9 +32,9 @@ var resetCmd = &cobra.Command{
 Stop and restart the browser instance used by the baikalctl admin interface.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		status, _, err := adminClient.Reset()
+		response, err := adminClient.Reset()
 		cobra.CheckErr(err)
-		fmt.Println(status)
+		PrintMessage(response)
 	},
 }
 

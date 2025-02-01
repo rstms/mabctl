@@ -22,8 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -35,9 +33,9 @@ var initCmd = &cobra.Command{
 Initialize and configure a newly installed Baikal server instance.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		status, _, err := adminClient.Initialize()
+		response, err := adminClient.Initialize()
 		cobra.CheckErr(err)
-		fmt.Println(status)
+		PrintMessage(response)
 	},
 }
 

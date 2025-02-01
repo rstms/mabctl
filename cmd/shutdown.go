@@ -22,7 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
 	"github.com/spf13/cobra"
 )
 
@@ -34,9 +33,9 @@ var shutdownCmd = &cobra.Command{
 Request server shutdown.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		shutdown, _, err := adminClient.RequestShutdown()
+		response, err := adminClient.RequestShutdown()
 		cobra.CheckErr(err)
-		fmt.Println(shutdown)
+		PrintMessage(response)
 	},
 }
 

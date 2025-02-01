@@ -22,8 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -37,9 +35,9 @@ Delete an address book from a user account.
 	Run: func(cmd *cobra.Command, args []string) {
 		userEmail := args[0]
 		addressBookName := args[1]
-		status, _, err := adminClient.DeleteAddressBook(userEmail, addressBookName)
+		response, err := adminClient.DeleteBook(userEmail, addressBookName)
 		cobra.CheckErr(err)
-		fmt.Println(status)
+		PrintMessage(response)
 	},
 }
 

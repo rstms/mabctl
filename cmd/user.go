@@ -22,7 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -38,15 +37,11 @@ Can be used to determine user existence.
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		username := args[0]
-		_, users, err := adminClient.GetUsers()
+		response, err := adminClient.GetUsers()
 		cobra.CheckErr(err)
-		for _, user := range *users {
+		for _, user := range response.Users {
 			if user.UserName == username {
-				if !quiet {
-					out, err := adminClient.Format(&user)
-					cobra.CheckErr(err)
-					fmt.Println(out)
-				}
+				PrintResponse(&user)
 				os.Exit(0)
 			}
 		}

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/rstms/mabctl/util"
 	"io/ioutil"
@@ -32,7 +31,7 @@ type User struct {
 	URI         string `json:"uri"`
 }
 
-type AddressBook struct {
+type Book struct {
 	UserName    string `json:"username"`
 	BookName    string `json:"bookname"`
 	Description string `json:"description"`
@@ -48,10 +47,41 @@ type Response struct {
 }
 
 type UsersResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-	Request string `json:"request"`
-	Users   []User `json:"users"`
+	Response
+	Users []User `json:"users"`
+}
+
+type AddUserResponse struct {
+	Response
+	User User `json:"user"`
+}
+
+type BooksResponse struct {
+	Response
+	Books []Book `json:"books"`
+}
+
+type AddBookResponse struct {
+	Response
+	Book []Book `json:"book"`
+}
+
+type StatusResponse struct {
+	Response
+	Status map[string]string `json:"status"`
+}
+
+type ErrorResponse struct {
+	Response
+	Detail string `json:"detail"`
+}
+
+func Format(data interface{}) (string, error) {
+	formatted, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return "", util.Fatalf("failed formatting JSON: %v", err)
+	}
+	return string(formatted), nil
 }
 
 func NewClient(username, password, url, cert, key, apikey string, insecure bool) (*Client, error) {
@@ -75,7 +105,6 @@ func NewClient(username, password, url, cert, key, apikey string, insecure bool)
 }
 
 func (c *Client) request(method, path string, data *[]byte) (*http.Request, error) {
-	fmt.Printf("request: %s, %s, %v\n", method, path, data)
 	var body *bytes.Buffer
 	if data == nil {
 		body = bytes.NewBuffer([]byte{})
@@ -95,161 +124,141 @@ func (c *Client) request(method, path string, data *[]byte) (*http.Request, erro
 	return req, nil
 }
 
-func (c *Client) get(path string, ret *map[string]interface{}) (string, *map[string]interface{}, error) {
+func (c *Client) get(path string, ret interface{}) error {
 	req, err := c.request("GET", path, nil)
 	if err != nil {
-		return "", nil, err
+		return err
 	}
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return "", nil, util.Fatalf("GET %s failed: %v", path, err)
+		return util.Fatalf("GET %s failed: %v", path, err)
 	}
 	defer resp.Body.Close()
 	return c.handleResponse("GET", path, resp, ret)
 }
 
-func (c *Client) post(path string, data *[]byte, ret *map[string]interface{}) (string, *map[string]interface{}, error) {
+func (c *Client) post(path string, data *[]byte, ret interface{}) error {
 	req, err := c.request("POST", path, data)
 	if err != nil {
-		return "", nil, err
+		return err
 	}
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return "", nil, util.Fatalf("POST %s failed: %v", path, err)
+		return util.Fatalf("POST %s failed: %v", path, err)
 	}
 	defer resp.Body.Close()
 	return c.handleResponse("POST", path, resp, ret)
 }
 
-func (c *Client) del(path string, data *[]byte, ret *map[string]interface{}) (string, *map[string]interface{}, error) {
+func (c *Client) del(path string, data *[]byte, ret interface{}) error {
 	req, err := c.request("DELETE", path, data)
 	if err != nil {
-		return "", nil, err
+		return err
 	}
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return "", nil, util.Fatalf("DELETE %s failed: %v", path, err)
+		return util.Fatalf("DELETE %s failed: %v", path, err)
 	}
 	defer resp.Body.Close()
 	return c.handleResponse("DELETE", path, resp, ret)
 }
 
-func (c *Client) handleResponse(method, path string, resp *http.Response, ret *map[string]interface{}) (string, *map[string]interface{}, error) {
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", nil, util.Fatalf("Error: %s %s '%s'", method, path, resp.Status)
-	}
+func (c *Client) handleResponse(method, path string, resp *http.Response, ret interface{}) error {
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", nil, util.Fatalf("%s %s failed reading response body: %v", method, path, err)
+		return util.Fatalf("%s %s failed reading response body: %v", method, path, err)
 	}
-	return c.formatResponse(body, ret)
-}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if resp.StatusCode != 500 {
+			return util.Fatalf("Error: %s %s '%s'\n%s", method, path, resp.Status, string(body))
+		}
+		var exception ErrorResponse
+		err := json.Unmarshal(body, &exception)
+		if err != nil {
+			return util.Fatalf("%s %s failed decoding error response: %v", method, path, string(body))
+		}
+		return fmt.Errorf("%s: %s", exception.Message, exception.Detail)
 
-func (c *Client) formatResponse(body []byte, ret *map[string]interface{}) (string, *map[string]interface{}, error) {
+	}
 	if len(body) == 0 {
-		return "{}", nil, nil
-	}
-	err := json.Unmarshal(body, ret)
-	if err != nil {
-		fmt.Printf("body: '%s'\n", string(body))
-		return "", nil, util.Fatalf("failed decoding response: %v", err)
-	}
-	formatted, err := c.Format(ret)
-	if err != nil {
-		return "", nil, err
-	}
-	return formatted, ret, nil
-}
-
-func (c *Client) Format(data interface{}) (string, error) {
-	formatted, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
-		return "", util.Fatalf("failed formatting JSON: %v", err)
-	}
-	return string(formatted), nil
-}
-
-func (c *Client) Initialize() (string, *map[string]interface{}, error) {
-	var ret map[string]interface{}
-	return c.post("/initialize/", nil, &ret)
-}
-
-func (c *Client) Reset() (string, *map[string]interface{}, error) {
-	var ret map[string]interface{}
-	return c.post("/reset/", nil, &ret)
-}
-
-func (c *Client) GetStatus() (string, *map[string]interface{}, error) {
-	var ret map[string]interface{}
-	return c.get("/status/", &ret)
-}
-
-func (c *Client) GetUptime() (string, *map[string]interface{}, error) {
-	var ret map[string]interface{}
-	return c.get("/uptime/", &ret)
-}
-
-func (c *Client) RequestShutdown() (string, *map[string]interface{}, error) {
-	var ret map[string]interface{}
-	return c.post("/shutdown/", nil, &ret)
-}
-
-func (c *Client) checkError(result string) error {
-	var msg ErrorMessage
-	err := json.Unmarshal([]byte(result), &msg)
-	if err != nil {
 		return nil
 	}
-	return errors.New(msg.Error)
-}
-
-func (c *Client) GetUsers() (string, *[]User, error) {
-	var ret map[string]interface{}
-	formatted, result, err := c.get("/users/", &ret)
+	err = json.Unmarshal(body, ret)
 	if err != nil {
-		return "", nil, err
+		return util.Fatalf("failed decoding response: %v\n%v", err, string(body))
 	}
-
-	fmt.Println(result)
-
-	//fmt.Printf("BEGIN RESULT\n%vEND RESULT\n", result)
-	/*
-		err = c.checkError(formatted)
-			if err != nil {
-				return "", nil, util.Fatalf("%v", err)
-			}
-
-			parsed := UsersResponse{}
-			err = json.Unmarshal([]byte(formatted), &parsed)
-			if err != nil {
-				return "", nil, util.Fatalf("failed unmarshalling users JSON response: %v", err)
-			}
-	*/
-	var users []User
-	return formatted, &users, nil
+	return nil
 }
 
-func (c *Client) GetAddressBooks(username string) (string, *map[string]AddressBook, error) {
-	var ret map[string]interface{}
-	var formatted string
+func (c *Client) Initialize() (*Response, error) {
+	var ret Response
+	err := c.post("/initialize/", nil, &ret)
+	if err != nil {
+		return nil, err
+	}
+	return &ret, nil
+}
+
+func (c *Client) Reset() (*Response, error) {
+	var ret Response
+	err := c.post("/reset/", nil, &ret)
+	if err != nil {
+		return nil, err
+	}
+	return &ret, nil
+}
+
+func (c *Client) GetStatus() (*StatusResponse, error) {
+	var ret StatusResponse
+	err := c.get("/status/", &ret)
+	if err != nil {
+		return nil, err
+	}
+	return &ret, nil
+}
+
+func (c *Client) GetUptime() (*Response, error) {
+	var ret Response
+	err := c.get("/uptime/", &ret)
+	if err != nil {
+		return nil, err
+	}
+	return &ret, nil
+}
+
+func (c *Client) RequestShutdown() (*Response, error) {
+	var ret Response
+	err := c.post("/shutdown/", nil, &ret)
+	if err != nil {
+		return nil, err
+	}
+	return &ret, nil
+}
+
+func (c *Client) GetUsers() (*UsersResponse, error) {
+	var ret UsersResponse
+	err := c.get("/users/", &ret)
+	if err != nil {
+		return nil, err
+	}
+	return &ret, nil
+}
+
+func (c *Client) GetBooks(username string) (*BooksResponse, error) {
+	var ret BooksResponse
 	var err error
 	if username == "" {
-		formatted, _, err = c.get("/books/", &ret)
+		err = c.get("/books/", &ret)
 	} else {
-		formatted, _, err = c.get(fmt.Sprintf("/books/%s/", url.PathEscape(username)), &ret)
+		err = c.get(fmt.Sprintf("/books/%s/", url.PathEscape(username)), &ret)
 	}
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
-	var books map[string]AddressBook
-	err = json.Unmarshal([]byte(formatted), &books)
-	if err != nil {
-		return "", nil, util.Fatalf("failed encoding AddressBooks: %v", err)
-	}
-	return formatted, &books, nil
+	return &ret, nil
 }
 
-func (c *Client) AddUser(username, display, password string) (string, *map[string]interface{}, error) {
+func (c *Client) AddUser(username, display, password string) (*AddUserResponse, error) {
 	user := map[string]string{
 		"username":    username,
 		"displayname": display,
@@ -257,13 +266,17 @@ func (c *Client) AddUser(username, display, password string) (string, *map[strin
 	}
 	jsonData, err := json.Marshal(user)
 	if err != nil {
-		return "", nil, util.Fatalf("failed formatting add user request data: %v", err)
+		return nil, util.Fatalf("failed formatting add user request data: %v", err)
 	}
-	var ret map[string]interface{}
-	return c.post("/user/", &jsonData, &ret)
+	var ret AddUserResponse
+	err = c.post("/user/", &jsonData, &ret)
+	if err != nil {
+		return nil, err
+	}
+	return &ret, nil
 }
 
-func (c *Client) AddAddressBook(email, name, description string) (string, *map[string]interface{}, error) {
+func (c *Client) AddBook(email, name, description string) (*AddBookResponse, error) {
 	book := map[string]string{
 		"username":    email,
 		"bookname":    name,
@@ -271,34 +284,45 @@ func (c *Client) AddAddressBook(email, name, description string) (string, *map[s
 	}
 	jsonData, err := json.Marshal(book)
 	if err != nil {
-		return "", nil, util.Fatalf("failed formatting add book request data: %v", err)
+		return nil, util.Fatalf("failed formatting add book request data: %v", err)
 	}
-	var ret map[string]interface{}
-	return c.post("/book/", &jsonData, &ret)
+	var ret AddBookResponse
+	err = c.post("/book/", &jsonData, &ret)
+	if err != nil {
+		return nil, err
+	}
+	return &ret, nil
 }
 
-func (c *Client) DeleteUser(email string) (string, *map[string]interface{}, error) {
+func (c *Client) DeleteUser(email string) (*Response, error) {
 	user := map[string]string{
 		"username": email,
 	}
 	jsonData, err := json.Marshal(user)
 	if err != nil {
-		return "", nil, util.Fatalf("failed formatting delete user request data: %v", err)
+		return nil, util.Fatalf("failed formatting delete user request data: %v", err)
 	}
-	var ret map[string]interface{}
-	return c.del("/user/", &jsonData, &ret)
+	var ret Response
+	err = c.del("/user/", &jsonData, &ret)
+	if err != nil {
+		return nil, err
+	}
+	return &ret, nil
 }
 
-func (c *Client) DeleteAddressBook(username, token string) (string, *map[string]interface{}, error) {
+func (c *Client) DeleteBook(username, token string) (*Response, error) {
 	user := map[string]string{
 		"username": username,
 		"token":    token,
 	}
 	jsonData, err := json.Marshal(user)
 	if err != nil {
-		return "", nil, util.Fatalf("failed formatting delete user request data: %v", err)
+		return nil, util.Fatalf("failed formatting delete user request data: %v", err)
 	}
-
-	var ret map[string]interface{}
-	return c.del("/book/", &jsonData, &ret)
+	var ret Response
+	err = c.del("/book/", &jsonData, &ret)
+	if err != nil {
+		return nil, err
+	}
+	return &ret, nil
 }

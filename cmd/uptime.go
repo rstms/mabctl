@@ -22,7 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
 	"github.com/spf13/cobra"
 )
 
@@ -34,9 +33,9 @@ var uptimeCmd = &cobra.Command{
 Query the admin server uptime and write to stdout as JSON
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		uptime, _, err := adminClient.GetUptime()
+		response, err := adminClient.GetUptime()
 		cobra.CheckErr(err)
-		fmt.Println(uptime)
+		PrintMessage(response)
 	},
 }
 

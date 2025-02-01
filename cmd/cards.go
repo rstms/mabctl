@@ -51,7 +51,7 @@ List data from the carddav server.
 }
 
 func init() {
-	lsCmd.AddCommand(cardsCmd)
+	rootCmd.AddCommand(cardsCmd)
 
 	// Here you will define your flags and configuration settings.
 

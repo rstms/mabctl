@@ -22,8 +22,8 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // statusCmd represents the status command
@@ -34,9 +34,13 @@ var statusCmd = &cobra.Command{
 Query the admin server status and write to stdout as JSON
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		status, _, err := adminClient.GetStatus()
+		response, err := adminClient.GetStatus()
 		cobra.CheckErr(err)
-		fmt.Println(status)
+		if viper.GetBool("verbose") {
+			PrintResponse(response)
+		} else {
+			PrintResponse(response.Status)
+		}
 	},
 }
 

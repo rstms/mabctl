@@ -22,6 +22,8 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -34,7 +36,6 @@ const Version = "0.0.3"
 
 var cfgFile string
 var adminClient *admin.Client
-var quiet bool
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -79,7 +80,15 @@ func init() {
 	// will be global for your application.
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.mabctl.yaml)")
-	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "short text output instead of JSON)")
+
+	rootCmd.PersistentFlags().BoolP("terse", "t", false, "output text instead of JSON)")
+	viper.BindPFlag("terse", rootCmd.PersistentFlags().Lookup("terse"))
+
+	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "output full response")
+	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
+
+	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "suppress output")
+	viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet"))
 
 	rootCmd.PersistentFlags().String("username", "", "username or email address")
 	viper.BindPFlag("username", rootCmd.PersistentFlags().Lookup("username"))
@@ -129,4 +138,29 @@ func initConfig() {
 
 	err := viper.ReadInConfig()
 	cobra.CheckErr(err)
+}
+
+func PrintMessage(response *admin.Response) {
+	if viper.GetBool("verbose") {
+		PrintResponse(response)
+	} else {
+		PrintResponse(response.Message)
+	}
+}
+
+func PrintResponse(response interface{}) {
+
+	if viper.GetBool("quiet") {
+		return
+	}
+
+	var out string
+	if viper.GetBool("terse") {
+		out = fmt.Sprintf("%v", response)
+	} else {
+		buf, err := json.MarshalIndent(response, "", "  ")
+		cobra.CheckErr(err)
+		out = string(buf)
+	}
+	fmt.Println(out)
 }

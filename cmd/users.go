@@ -22,9 +22,8 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // usersCmd represents the users command
@@ -35,14 +34,18 @@ var usersCmd = &cobra.Command{
 Query all user accounts from carddav admin interface and output as JSON.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		users, _, err := adminClient.GetUsers()
+		response, err := adminClient.GetUsers()
 		cobra.CheckErr(err)
-		fmt.Println(users)
+		if viper.GetBool("verbose") {
+			PrintResponse(response)
+		} else {
+			PrintResponse(response.Users)
+		}
 	},
 }
 
 func init() {
-	lsCmd.AddCommand(usersCmd)
+	rootCmd.AddCommand(usersCmd)
 
 	// Here you will define your flags and configuration settings.
 

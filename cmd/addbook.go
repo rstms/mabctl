@@ -22,9 +22,8 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var addBookCmd = &cobra.Command{
@@ -38,9 +37,13 @@ Add a new address book to an existing user account.
 		email := args[0]
 		name := args[1]
 		description := args[2]
-		books, _, err := adminClient.AddAddressBook(email, name, description)
+		response, err := adminClient.AddBook(email, name, description)
 		cobra.CheckErr(err)
-		fmt.Println(books)
+		if viper.GetBool("verbose") {
+			PrintResponse(response)
+		} else {
+			PrintResponse(response.Book)
+		}
 	},
 }
 

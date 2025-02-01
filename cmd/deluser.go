@@ -22,8 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -36,9 +34,9 @@ Delete a user account from the caldav/carddav server.
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		email := args[0]
-		status, _, err := adminClient.DeleteUser(email)
+		response, err := adminClient.DeleteUser(email)
 		cobra.CheckErr(err)
-		fmt.Println(status)
+		PrintResponse(response)
 	},
 }
 
