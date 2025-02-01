@@ -23,47 +23,23 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-
 	"github.com/spf13/cobra"
 )
 
-var userCmd = &cobra.Command{
-	Use:   "user EMAIL",
-	Short: "display a user",
+// shutdownCmd represents the shutdown command
+var shutdownCmd = &cobra.Command{
+	Use:   "shutdown",
+	Short: "request shutdown",
 	Long: `
-Output JSON data for a user account.  Sets exit code non-zero on error.
-Can be used to determine user existence.
+Request server shutdown.
 `,
-	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		username := args[0]
-		_, users, err := adminClient.GetUsers()
+		shutdown, _, err := adminClient.RequestShutdown()
 		cobra.CheckErr(err)
-		for _, user := range *users {
-			if user.UserName == username {
-				if !quiet {
-					out, err := adminClient.Format(&user)
-					cobra.CheckErr(err)
-					fmt.Println(out)
-				}
-				os.Exit(0)
-			}
-		}
-		os.Exit(1)
+		fmt.Println(shutdown)
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(userCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// usersCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// usersCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.AddCommand(shutdownCmd)
 }
