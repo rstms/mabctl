@@ -84,6 +84,22 @@ func Format(data interface{}) (string, error) {
 	return string(formatted), nil
 }
 
+func FormatIfJSON(body []byte) string {
+	if len(body) == 0 {
+		return ""
+	}
+	decoded := map[string]interface{}{}
+	err := json.Unmarshal(body, &decoded)
+	if err != nil {
+		return string(body)
+	}
+	formatted, err := json.MarshalIndent(&decoded, "", "  ")
+	if err != nil {
+		return string(body)
+	}
+	return string(formatted)
+}
+
 func NewClient(username, password, url, cert, key, apikey string, insecure bool) (*Client, error) {
 	c := Client{username, password, url, cert, key, apikey, nil}
 
@@ -169,16 +185,7 @@ func (c *Client) handleResponse(method, path string, resp *http.Response, ret in
 		return util.Fatalf("%s %s failed reading response body: %v", method, path, err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		if resp.StatusCode != 500 {
-			return util.Fatalf("Error: %s %s '%s'\n%s", method, path, resp.Status, string(body))
-		}
-		var exception ErrorResponse
-		err := json.Unmarshal(body, &exception)
-		if err != nil {
-			return util.Fatalf("%s %s failed decoding error response: %v", method, path, string(body))
-		}
-		return fmt.Errorf("%s: %s", exception.Message, exception.Detail)
-
+		return util.Fatalf("Error: %s %s '%s'\n%s", method, path, resp.Status, FormatIfJSON(body))
 	}
 	if len(body) == 0 {
 		return nil
