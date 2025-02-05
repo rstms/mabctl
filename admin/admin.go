@@ -63,7 +63,7 @@ type BooksResponse struct {
 
 type AddBookResponse struct {
 	Response
-	Book []Book `json:"book"`
+	Book Book `json:"book"`
 }
 
 type StatusResponse struct {

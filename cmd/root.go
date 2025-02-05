@@ -78,6 +78,8 @@ func init() {
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
+	cacheDir, err := os.UserCacheDir()
+	cobra.CheckErr(err)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.mabctl.yaml)")
 
@@ -94,9 +96,10 @@ func init() {
 	viper.BindPFlag("username", rootCmd.PersistentFlags().Lookup("username"))
 	rootCmd.PersistentFlags().String("password", "", "carddav account password")
 	viper.BindPFlag("password", rootCmd.PersistentFlags().Lookup("password"))
-	rootCmd.PersistentFlags().String("cert", "", "client certificate PEM file")
+
+	rootCmd.PersistentFlags().String("cert", filepath.Join(cacheDir, "client.pem"), "client certificate PEM file")
 	viper.BindPFlag("cert", rootCmd.PersistentFlags().Lookup("cert"))
-	rootCmd.PersistentFlags().String("key", "", "client certificate private key PEM file")
+	rootCmd.PersistentFlags().String("key", filepath.Join(cacheDir, "client.key"), "client certificate private key PEM file")
 	viper.BindPFlag("key", rootCmd.PersistentFlags().Lookup("key"))
 	rootCmd.PersistentFlags().String("url", "", "carddav server URL")
 	viper.BindPFlag("url", rootCmd.PersistentFlags().Lookup("url"))
@@ -131,6 +134,7 @@ func initConfig() {
 		viper.AddConfigPath(".")
 		viper.SetConfigType("yaml")
 		viper.SetConfigName("mabctl")
+
 	}
 
 	viper.SetEnvPrefix("mabctl")
