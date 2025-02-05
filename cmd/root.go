@@ -35,6 +35,7 @@ import (
 const Version = "1.0.8"
 
 var cfgFile string
+var writeConfig bool
 var adminClient *admin.Client
 
 // rootCmd represents the base command when called without any subcommands
@@ -46,20 +47,26 @@ Administration tool for a baikal carddav/caldav server.
 `,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 
-		a, err := admin.NewClient(
-			viper.GetString("admin_username"),
-			viper.GetString("admin_password"),
-			viper.GetString("admin_url"),
-			viper.GetString("cert"),
-			viper.GetString("key"),
-			viper.GetString("api_key"),
-			viper.GetBool("insecure"),
-		)
-		cobra.CheckErr(err)
-		adminClient = a
+		if ! writeConfig {
+			a, err := admin.NewClient(
+				viper.GetString("admin_username"),
+				viper.GetString("admin_password"),
+				viper.GetString("admin_url"),
+				viper.GetString("cert"),
+				viper.GetString("key"),
+				viper.GetString("api_key"),
+				viper.GetBool("insecure"),
+			)
+			cobra.CheckErr(err)
+			adminClient = a
+		}
 	},
 	PersistentPostRun: func(cmd *cobra.Command, args []string) {
-
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+	    if writeConfig {
+		writeConfigFile()
+	    }
 	},
 }
 
@@ -78,10 +85,12 @@ func init() {
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
-	cacheDir, err := os.UserCacheDir()
+	home, err := os.UserHomeDir()
 	cobra.CheckErr(err)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.mabctl.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.mabctl)")
+
+	rootCmd.PersistentFlags().BoolVar(&writeConfig, "initconfig", false, "write default config to $HOME/.mabctl")
 
 	rootCmd.PersistentFlags().BoolP("terse", "t", false, "output text instead of JSON)")
 	viper.BindPFlag("terse", rootCmd.PersistentFlags().Lookup("terse"))
@@ -97,9 +106,9 @@ func init() {
 	rootCmd.PersistentFlags().String("password", "", "carddav account password")
 	viper.BindPFlag("password", rootCmd.PersistentFlags().Lookup("password"))
 
-	rootCmd.PersistentFlags().String("cert", filepath.Join(cacheDir, "client.pem"), "client certificate PEM file")
+	rootCmd.PersistentFlags().String("cert", filepath.Join(home, "certs", "client.pem"), "client certificate PEM file")
 	viper.BindPFlag("cert", rootCmd.PersistentFlags().Lookup("cert"))
-	rootCmd.PersistentFlags().String("key", filepath.Join(cacheDir, "client.key"), "client certificate private key PEM file")
+	rootCmd.PersistentFlags().String("key", filepath.Join(home, "certs", "client.key"), "client certificate private key PEM file")
 	viper.BindPFlag("key", rootCmd.PersistentFlags().Lookup("key"))
 	rootCmd.PersistentFlags().String("url", "", "carddav server URL")
 	viper.BindPFlag("url", rootCmd.PersistentFlags().Lookup("url"))
@@ -115,33 +124,74 @@ func init() {
 	viper.BindPFlag("api_key", rootCmd.PersistentFlags().Lookup("api-key"))
 }
 
-// initConfig reads in config file and ENV variables if set.
-func initConfig() {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// Find home directory.
-		configDir, err := os.UserConfigDir()
-		cobra.CheckErr(err)
-		viper.AddConfigPath(filepath.Join(configDir, "mabctl"))
+func setupConfigFileSearch() {
+	viper.SetConfigType("yaml")
 
+	if cfgFile != "" {
+		_, err := os.Stat(cfgFile)
+		if !os.IsNotExist(err) {
+			// --config set, and is a file, so read the file and don't search
+			viper.SetConfigFile(cfgFile)
+			return
+		}
+
+		// --config set, but not a file, so use it as the search name
+		viper.SetConfigName(cfgFile)
+
+	} else {
 		home, err := os.UserHomeDir()
 		cobra.CheckErr(err)
+		_, err = os.Stat(filepath.Join(home, ".mabctl"))
+		if !os.IsNotExist(err) {
+			// --config unset and ~/.mabctl exists, so use it and don't search
+			viper.SetConfigFile(filepath.Join(home, ".mabctl"))
+			return
+		}
 
-		// Search config in home directory with name ".mabctl" (without extension).
-		viper.AddConfigPath(home)
-		viper.AddConfigPath(".")
-		viper.SetConfigType("yaml")
-		viper.SetConfigName("mabctl")
-
+		// --config unset, so use the default search name
+		viper.SetConfigName("config")
 	}
+
+	// setup config search dirs
+	user, err := os.UserConfigDir()
+	cobra.CheckErr(err)
+
+	viper.AddConfigPath(".")
+	viper.AddConfigPath(filepath.Join(user, "mabctl"))
+	viper.AddConfigPath("/etc/mabctl")
+}
+
+func initConfig() {
+
+	setupConfigFileSearch()
 
 	viper.SetEnvPrefix("mabctl")
 	viper.AutomaticEnv() // read in environment variables that match
 
-	err := viper.ReadInConfig()
+	if !writeConfig {
+		err := viper.ReadInConfig()
+		cobra.CheckErr(err)
+
+		if viper.GetBool("verbose") {
+			fmt.Fprintf(os.Stderr, "Configured from file: %v\n", viper.ConfigFileUsed())
+		}
+	}
+}
+
+func writeConfigFile() {
+	if cfgFile == "" {
+		home, err := os.UserHomeDir()
+		cobra.CheckErr(err)
+		cfgFile = filepath.Join(home, ".mabctl")
+		_, err = os.Stat(cfgFile)
+		if !os.IsNotExist(err) {
+			cobra.CheckErr(fmt.Errorf("not overwriting existing config file: %v", cfgFile))
+		}
+	}
+	err := viper.WriteConfigAs(cfgFile)
 	cobra.CheckErr(err)
+	fmt.Fprintf(os.Stderr, "Default config written to %v\n", cfgFile)
+	os.Exit(0)
 }
 
 func PrintMessage(response *admin.Response) {
