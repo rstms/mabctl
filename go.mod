@@ -1,9 +1,9 @@
 module github.com/rstms/mabctl
 
-go 1.22.5
+go 1.22.1
 
 require (
-	github.com/emersion/go-webdav v0.5.0
+	github.com/emersion/go-webdav v0.6.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 )

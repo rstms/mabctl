@@ -1,7 +1,7 @@
 
 bin = mabctll
 
-$(bin): fmt
+$(bin): go.sum 
 	fix go build
 
 run:
@@ -15,6 +15,16 @@ fmt:
 
 clean:
 	go clean
+
+sterile: clean
+	rm -f go.mod
+	rm -f go.sum
+
+go.sum: go.mod
+	go mod tidy
+
+go.mod:
+	go mod init
 
 install: $(bin)
 	go install
