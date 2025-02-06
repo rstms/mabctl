@@ -31,7 +31,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-const Version = "1.1.1"
+const Version = "1.1.2"
 
 var cfgFile string
 var writeConfig bool
