@@ -26,7 +26,7 @@ import (
 )
 
 var deleteAddressBookCmd = &cobra.Command{
-	Use:   "book USER_EMAIL ADDRESS_BOOK_NAME",
+	Use:   "book USER_EMAIL ADDRESS_BOOK_TOKEN",
 	Short: "delete an address book",
 	Long: `
 Delete an address book from a user account.
@@ -34,8 +34,8 @@ Delete an address book from a user account.
 	Args: cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		userEmail := args[0]
-		addressBookName := args[1]
-		response, err := adminClient.DeleteBook(userEmail, addressBookName)
+		addressBookToken := args[1]
+		response, err := adminClient.DeleteBook(userEmail, addressBookToken)
 		cobra.CheckErr(err)
 		PrintMessage(response)
 	},
