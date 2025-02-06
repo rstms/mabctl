@@ -46,7 +46,9 @@ Administration tool for a baikal carddav/caldav server.
 `,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 
-		if ! writeConfig {
+		if writeConfig {
+		    writeConfigFile()
+		} else {
 			a, err := api.NewClient(
 				viper.GetString("admin_username"),
 				viper.GetString("admin_password"),
@@ -62,11 +64,7 @@ Administration tool for a baikal carddav/caldav server.
 	},
 	PersistentPostRun: func(cmd *cobra.Command, args []string) {
 	},
-	Run: func(cmd *cobra.Command, args []string) {
-	    if writeConfig {
-		writeConfigFile()
-	    }
-	},
+	// Run: func(cmd *cobra.Command, args []string) {}
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
