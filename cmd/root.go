@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-
 	"github.com/rstms/mabctl/api"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
