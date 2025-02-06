@@ -27,7 +27,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/rstms/mabctl/admin"
+	"github.com/rstms/mabctl/api"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -36,7 +36,7 @@ const Version = "1.0.9"
 
 var cfgFile string
 var writeConfig bool
-var adminClient *admin.Client
+var adminClient *api.Client
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -48,7 +48,7 @@ Administration tool for a baikal carddav/caldav server.
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 
 		if ! writeConfig {
-			a, err := admin.NewClient(
+			a, err := api.NewClient(
 				viper.GetString("admin_username"),
 				viper.GetString("admin_password"),
 				viper.GetString("admin_url"),
@@ -194,7 +194,7 @@ func writeConfigFile() {
 	os.Exit(0)
 }
 
-func PrintMessage(response *admin.Response) {
+func PrintMessage(response *api.Response) {
 	if viper.GetBool("verbose") {
 		PrintResponse(response)
 	} else {
