@@ -17,8 +17,10 @@ clean:
 	go clean
 
 sterile: clean
+	go clean -cache -modcache -testcache -i
 	rm -f go.mod
 	rm -f go.sum
+
 
 go.sum: go.mod
 	go mod tidy
@@ -31,3 +33,6 @@ install: $(bin)
 
 release:
 	gh release create v$(shell cat VERSION) --generate-notes --target master
+
+update:
+	go get github.com/rstms/go-webdav@$(shell gh --repo rstms/go-webdav release list | awk '{print $$1;exit}')

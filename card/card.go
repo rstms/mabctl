@@ -4,14 +4,11 @@ import (
 	"context"
 	"crypto/md5"
 	"crypto/rand"
-	"encoding/base64"
-	"encoding/hex"
 	"fmt"
-	"github.com/emersion/go-webdav"
-	"github.com/emersion/go-webdav/carddav"
+	"github.com/rstms/go-webdav"
+	"github.com/rstms/go-webdav/carddav"
 	"github.com/rstms/mabctl/util"
 	"net/http"
-	"regexp"
 	"strings"
 )
 
@@ -32,109 +29,149 @@ type digestAuthHTTPClient struct {
 	qop         string
 	nonceCount  int
 	clientNonce string
-	hash1       string
+	method      string
+	uri         string
 }
 
 func (c *digestAuthHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	fmt.Printf("\nrequest: %+v\n", req)
+	fmt.Printf("\nheaders: %+v\n", req.Header)
 	if c.realm != "" {
+		panic("regenerate")
 		c.generateAuthHeader(req)
 	}
 	resp, err := c.c.Do(req)
 	if err != nil {
 		return nil, util.Fatalf("request failed: %v\n", err)
 	}
-	if resp.StatusCode == 401 {
-		authHeader, ok := resp.Header["Www-Authenticate"]
-		if !ok {
-			return nil, util.Fatalf("Received %s w/o WWW-Authenticate header", resp.Status)
-		}
-		err := c.handleAuthHeader(authHeader)
+	if resp.StatusCode == http.StatusUnauthorized {
+
+		challengeHeader := resp.Header.Get("Www-Authenticate")
+
+		err := c.parseAuthHeader(challengeHeader)
 		if err != nil {
 			return nil, err
 		}
-		if c.realm != "" {
-			c.generateAuthHeader(req)
-			resp, err := c.c.Do(req)
-			if err != nil {
-				return nil, util.Fatalf("authorized request failed: %v", err)
-			}
-			return resp, nil
+
+		err = c.generateAuthHeader(req)
+		if err != nil {
+			return nil, err
 		}
-		panic("realm not set")
+		resp, err = c.c.Do(req)
+		if err != nil {
+			fmt.Printf("\nresponse: %v\n", resp)
+			return nil, util.Fatalf("response-authorized request failed: %v", err)
+		}
 	}
-	fmt.Printf("\nresponse: %+v\n", resp)
-	return resp, err
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, util.Fatalf("request failed: [%d] %v\n", resp.StatusCode, resp)
+	}
+	return resp, nil
 }
 
-// var AUTH_HEADER_PATTERN = regexp.MustCompile(`^(Digest) \([^=]*="[^"]*\)",*.*`)
-// var AUTH_HEADER_PATTERN = regexp.MustCompile(`([a-zA-Z][^=]*="[^"]")`)
-var HEADER = regexp.MustCompile(`([a-zA-Z][^=]*="[^"]*")`)
-var FIELD = regexp.MustCompile(`([^=]*)="([^"]*)"`)
+func (c *digestAuthHTTPClient) parseAuthHeader(authHeader string) error {
+	fmt.Printf("challengeHeader: %s\n", authHeader)
 
-func (c *digestAuthHTTPClient) handleAuthHeader(values []string) error {
-	if len(values) != 1 {
-		return util.Fatalf("unexpected auth header format")
+	if !strings.HasPrefix(authHeader, "Digest ") {
+		return util.Fatalf("unrecognised auth header: %s", authHeader)
 	}
-	if values[0][0:7] != "Digest " {
-		return util.Fatalf("auth header not Digest")
-	}
-	matches := HEADER.FindAllStringSubmatch(values[0][7:], -1)
-	for _, match := range matches {
-		fields := FIELD.FindStringSubmatch(match[1])
-		if len(fields) != 3 {
-			return util.Fatalf("failed parsing auth header fields")
-		}
-		switch fields[1] {
-		case "nonce":
-			c.nonce = fields[2]
-			c.nonceCount = 0
-			n, err := nonce(16)
-			if err != nil {
-				return util.Fatalf("failed generating nonce: %v", err)
+	parts := strings.SplitAfter(authHeader, " ")
+	authHeader = parts[1]
+	c.nonce = ""
+	c.realm = ""
+	c.opaque = ""
+	c.qop = ""
+	c.uri = ""
+	for _, param := range strings.Split(authHeader, ",") {
+		parts := strings.SplitN(strings.TrimSpace(param), "=", 2)
+		if len(parts) == 2 {
+			key := strings.Trim(parts[0], ` "`)
+			value := strings.Trim(parts[1], ` "`)
+			fmt.Printf("%s: %s\n", key, value)
+			switch key {
+			case "nonce":
+				c.nonce = value
+			case "realm":
+				c.realm = value
+			case "opaque":
+				c.opaque = value
+			case "qop":
+				c.qop = value
+			case "uri":
+				c.uri = value
 			}
-			c.clientNonce = n
-		case "opaque":
-			c.opaque = fields[2]
-		case "qop":
-			c.qop = fields[2]
-		case "realm":
-			c.realm = fields[2]
-			c.hash1 = hash(c.username + ":" + c.realm + ":" + c.password)
-		default:
-			return util.Fatalf("unexpected field in auth header: %s", fields[1])
 		}
+	}
+	if c.nonce == "" {
+		return util.Fatalf("nonce not found: %v", authHeader)
+	}
+	if c.realm == "" {
+		return util.Fatalf("realm not found: %v", authHeader)
+	}
+	if c.qop != "auth" {
+		return util.Fatalf("unimplemented qop: %v", c.qop)
 	}
 	return nil
 }
 
-func nonce(length int) (string, error) {
+func randomNonce(length int) (string, error) {
 	randomBytes := make([]byte, length)
 	_, err := rand.Read(randomBytes)
 	if err != nil {
-		return "", err
+		return "", util.Fatalf("random nonce generation failed: %v", err)
 	}
-	n := base64.StdEncoding.EncodeToString(randomBytes)
-	return n, nil
+	return fmt.Sprintf("%x", string(randomBytes)), nil
 }
 
-func hash(clearText string) string {
-	hasher := md5.New()
-	hasher.Write([]byte(clearText))
-	hash := hasher.Sum(nil)
-	hashText := hex.EncodeToString(hash)
-	fmt.Printf("hash(%s)->%s\n", clearText, hashText)
-	return hashText
+func md5sum(data string) string {
+	return fmt.Sprintf("%x", md5.Sum([]byte(data)))
 }
 
-func (c *digestAuthHTTPClient) generateAuthHeader(req *http.Request) {
+func encodeNonce(count int) string {
+	return fmt.Sprintf("%08x", count)
+}
+
+func (c *digestAuthHTTPClient) generateAuthHeader(req *http.Request) error {
+
+	c.method = req.Method
+	//c.uri = req.URL.Path
+
 	c.nonceCount++
-	hash2 := hash(req.Method + ":" + req.URL.Path)
-	response := hash(c.hash1 + ":" + c.nonce + ":" + hash2)
-	header := fmt.Sprintf(`Digest username="%s", realm="%s", nonce="%s", uri="%s" response="%s", qop=%s, nc=%d, cnonce="%s"`,
-		c.username, c.realm, c.nonce, req.RequestURI, response, c.qop, c.nonceCount, c.clientNonce)
-	fmt.Printf("Setting Authorization header: %s\n", header)
+	n, err := randomNonce(6)
+	if err != nil {
+		return err
+	}
+	c.clientNonce = n
+
+	/* example values from RFC2617
+	c.username="Mufasa"
+	c.password="Circle Of Life"
+	c.realm="testrealm@host.com"
+	c.method="GET"
+	c.uri="/dir/index.html"
+	c.nonce = "dcd98b7102dd2f0e8b11d0f600bfb0c093"
+	c.opaque ="5ccc069c403ebaf9f0171e9517f40e41"
+	c.clientNonce = "0a4f113b"
+	c.nonceCount=1
+	*/
+
+	HA1Text := c.username + ":" + c.realm + ":" + c.password
+	HA1 := md5sum(HA1Text)
+	fmt.Printf("HA1: %s %s\n", HA1, HA1Text)
+
+	HA2Text := fmt.Sprintf("%s:%s", c.method, c.uri)
+	HA2 := md5sum(HA2Text)
+	fmt.Printf("HA2: %s %s\n", HA2, HA2Text)
+
+	responseText := fmt.Sprintf("%s:%s:%s:%s:%s:%s", HA1, c.nonce, encodeNonce(c.nonceCount), c.clientNonce, c.qop, HA2)
+	response := md5sum(responseText)
+	fmt.Printf("response: %s %s\n", response, responseText)
+
+	header := fmt.Sprintf(`Digest username="%s",realm="%s",nonce="%s",uri="%s",response="%s",qop="%s",nc="%s",cnonce="%s",opaque="%s"`,
+		c.username, c.realm, c.nonce, c.uri, response, c.qop, encodeNonce(c.nonceCount), c.clientNonce, c.opaque)
+	fmt.Printf("responseHeader: %s\n", header)
 	req.Header.Set("Authorization", header)
+	return nil
 }
 
 func HTTPClientWithDigestAuth(client *http.Client, username, password string) webdav.HTTPClient {
@@ -146,7 +183,7 @@ func HTTPClientWithDigestAuth(client *http.Client, username, password string) we
 }
 
 func NewClient(username, password, url string) (*Client, error) {
-	fmt.Printf("%s %s %s\n", username, password, url)
+	fmt.Printf("NewClient: %s %s %s\n", username, password, url)
 	if url == "" {
 		fields := strings.Split(username, "@")
 		if len(fields) != 2 {
@@ -175,160 +212,15 @@ func NewClient(username, password, url string) (*Client, error) {
 }
 
 func (c *Client) List() (string, error) {
-	homeSet, err := c.client.FindAddressBookHomeSet(context.Background(), c.username)
+	ctx := context.Background()
+	cup, err := c.client.FindCurrentUserPrincipal(ctx)
+	if err != nil {
+		return "", util.Fatalf("FindCurrentUserPrincipal failed: %v", err)
+	}
+	fmt.Print("CurrentUserPrincipal: %+v\n", cup)
+	homeSet, err := c.client.FindAddressBookHomeSet(context.Background(), cup)
 	if err != nil {
 		return "", util.Fatalf("FindAddressBookHomeSet failed: %v", err)
 	}
 	return homeSet, nil
 }
-
-/*
-func (c *Client) readBody(method, url string, resp *http.Response) ([]byte, error) {
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, util.Fatalf("%s %s failed reading response body: %v", method, url, err)
-	}
-
-	return body, nil
-}
-
-func (c *Client) get(url string) ([]byte, error) {
-	resp, err := c.client.Get(url)
-	if err != nil {
-		return nil, util.Fatalf("GET %s failed: %v", url, err)
-	}
-	defer resp.Body.Close()
-	return c.readBody("GET", url, resp)
-}
-
-func (c *Client) post(url string, data *bytes.Buffer) ([]byte, error) {
-	resp, err := c.client.Post(url, "application/json", data)
-	if err != nil {
-		return nil, util.Fatalf("POST %s failed: %v", url, err)
-	}
-	defer resp.Body.Close()
-	return c.readBody("POST", url, resp)
-}
-
-func (c *Client) del(url string) ([]byte, error) {
-	req, err := http.NewRequest("DELETE", url, nil)
-	if err != nil {
-		return nil, util.Fatalf("failed creating DELETE %s request: %v", url, err)
-	}
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, util.Fatalf("DELETE %s failed: %v", url, err)
-	}
-	defer resp.Body.Close()
-	return c.readBody("DELETE", url, resp)
-}
-
-func (c *Client) formatResponse(body []byte) (string, error) {
-	var data map[string]interface{}
-	err := json.Unmarshal(body, &data)
-	if err != nil {
-		return "", util.Fatalf("failed decoding response: %v", err)
-	}
-	formatted, err := json.MarshalIndent(&data, "", "  ")
-	if err != nil {
-		return "", util.Fatalf("failed formatting response: %v", err)
-	}
-	return string(formatted), nil
-}
-
-func (c *Client) Initialize() (string, error) {
-
-	body, err := c.post(c.url+"/initialize/", bytes.NewBuffer([]byte{}))
-	if err != nil {
-		return "", err
-	}
-	return c.formatResponse(body)
-}
-
-func (c *Client) Reset() (string, error) {
-
-	body, err := c.post(c.url+"/reset/", bytes.NewBuffer([]byte{}))
-	if err != nil {
-		return "", err
-	}
-	return c.formatResponse(body)
-}
-
-func (c *Client) GetStatus() (string, error) {
-
-	body, err := c.get(c.url + "/status/")
-	if err != nil {
-		return "", err
-	}
-	return c.formatResponse(body)
-}
-
-func (c *Client) GetUsers() (string, error) {
-	body, err := c.get(c.url + "/users/")
-	if err != nil {
-		return "", err
-	}
-	return c.formatResponse(body)
-}
-
-func (c *Client) GetAddressBooks(email string) (string, error) {
-	path := fmt.Sprintf("%s/addressbooks/%s/", c.url, url.PathEscape(email))
-	body, err := c.get(path)
-	if err != nil {
-		return "", err
-	}
-	return c.formatResponse(body)
-}
-
-func (c *Client) AddUser(email, display, password string) (string, error) {
-	user := map[string]string{
-		"username":    email,
-		"displayname": display,
-		"password":    password,
-	}
-	jsonData, err := json.Marshal(user)
-	if err != nil {
-		return "", util.Fatalf("failed formatting form data: %v", err)
-	}
-	body, err := c.post(c.url+"/user/", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return "", util.Fatalf("POST failed: %v", err)
-	}
-	return c.formatResponse(body)
-}
-
-func (c *Client) AddAddressBook(email, name, description string) (string, error) {
-	user := map[string]string{
-		"username":    email,
-		"bookname":    name,
-		"description": description,
-	}
-	jsonData, err := json.Marshal(user)
-	if err != nil {
-		return "", util.Fatalf("failed formatting form data: %v", err)
-	}
-	body, err := c.post(c.url+"/addressbook/", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return "", util.Fatalf("POST failed: %v", err)
-	}
-	return c.formatResponse(body)
-}
-
-func (c *Client) DeleteUser(email string) (string, error) {
-	path := fmt.Sprintf("%s/user/%s/", c.url, url.PathEscape(email))
-	body, err := c.del(path)
-	if err != nil {
-		return "", util.Fatalf("DELETE failed: %v", err)
-	}
-	return c.formatResponse(body)
-}
-
-func (c *Client) DeleteAddressBook(userEmail, addressBookName string) (string, error) {
-	path := fmt.Sprintf("%s/addressbook/%s/%s/", c.url, url.PathEscape(userEmail), url.PathEscape(addressBookName))
-	body, err := c.del(path)
-	if err != nil {
-		return "", util.Fatalf("DELETE failed: %v", err)
-	}
-	return c.formatResponse(body)
-}
-*/

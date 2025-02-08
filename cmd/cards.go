@@ -25,22 +25,28 @@ import (
 	"fmt"
 	"github.com/rstms/mabctl/card"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // cardsCmd represents the cards command
 var cardsCmd = &cobra.Command{
-	Use:   "cards EMAIL PASSWORD [URL]",
+	Use:   "cards [USERNAME]",
 	Short: "list carddav cards",
 	Long: `
 List data from the carddav server.
 `,
-	Args: cobra.RangeArgs(2, 3),
+	Args: cobra.RangeArgs(0, 1),
 	Run: func(cmd *cobra.Command, args []string) {
-		username := args[0]
-		password := args[1]
-		url := ""
-		if len(args) > 2 {
-			url = args[2]
+		var username string
+		if len(args) > 0 {
+			username = args[0]
+		} else {
+			username = viper.GetString("username")
+		}
+		password := viper.GetString("password")
+		url := viper.GetString("url")
+		if viper.GetBool("discover") {
+			url = ""
 		}
 		cardClient, err := card.NewClient(username, password, url)
 		cobra.CheckErr(err)
