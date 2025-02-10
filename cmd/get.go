@@ -22,43 +22,40 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"os"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-// adduserCmd represents the adduser command
-var adduserCmd = &cobra.Command{
-	Use:   "user EMAIL DISPLAY_NAME PASSWORD",
-	Short: "add a user account",
+var getCmd = &cobra.Command{
+	Use:   "get USERNAME BOOKNAME EMAIL",
+	Short: "lookup address in address book",
 	Long: `
-Add a user account to the caldav/carddav server.  Usernames are email
-addresses by convention.  The display name will be visible to the user.
+Search for address in CardDAV address book BOOKNAME under the user account
+USERNAME. Output matching records. Set exit code 0 if at least one record exists.
 `,
 	Args: cobra.ExactArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
-		email := args[0]
-		display := args[1]
-		password := args[2]
-		response, err := adminClient.AddUser(email, display, password)
+		username := args[0]
+		bookname := args[1]
+		email := args[2]
+		response, err := MAB.QueryAddress(username, bookname, email)
 		cobra.CheckErr(err)
-		if viper.GetBool("verbose") {
-			PrintResponse(response)
-		} else {
-			PrintResponse(response.User)
+		if !HandleResponse(response, response.Addresses) {
+		    if ! viper.GetBool("quiet") {
+			for _, addr := range response.Addresses {
+			    cmd.Println(addr.Path)
+			}
+		    }
 		}
+		exitCode := 1
+		if len(response.Addresses) > 0 {
+		    exitCode = 0
+		}
+		os.Exit(exitCode)
 	},
 }
 
 func init() {
-	addCmd.AddCommand(adduserCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// adduserCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// adduserCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.AddCommand(getCmd)
 }

@@ -22,38 +22,26 @@ THE SOFTWARE.
 package cmd
 
 import (
+	//"regexp"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
-// statusCmd represents the status command
-var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "admin server status",
+var rmbookCmd = &cobra.Command{
+	Use:   "rmbook USERNAME BOOKNAME",
+	Short: "delete an address book",
 	Long: `
-Query the admin server status and write to stdout as JSON
+Delete address book identified by USERNAME and BOOKNAME
 `,
+	Args: cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		response, err := MAB.GetStatus()
+		username := args[0]
+		bookname := args[1]
+		response, err := MAB.DeleteBook(username, bookname)
 		cobra.CheckErr(err)
-		if viper.GetBool("verbose") {
-			PrintResponse(response)
-		} else {
-			PrintResponse(response.Status)
-		}
+		PrintMessage(response)
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(statusCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// statusCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// statusCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.AddCommand(rmbookCmd)
 }

@@ -33,7 +33,7 @@ var uptimeCmd = &cobra.Command{
 Query the admin server uptime and write to stdout as JSON
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		response, err := adminClient.GetUptime()
+		response, err := MAB.GetUptime()
 		cobra.CheckErr(err)
 		PrintMessage(response)
 	},

@@ -3,13 +3,15 @@ module github.com/rstms/mabctl
 go 1.22.1
 
 require (
-	github.com/rstms/go-webdav v0.6.8
+	github.com/emersion/go-vcard v0.0.0-20230815062825-8fda7d206ec9
+	github.com/emersion/go-webdav v0.6.0
+	github.com/google/uuid v1.4.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
+	github.com/studio-b12/gowebdav v0.10.0
 )
 
 require (
-	github.com/emersion/go-vcard v0.0.0-20241024213814-c9703dde27ff // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect

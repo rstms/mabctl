@@ -36,8 +36,9 @@ const Version = "1.1.4"
 
 const ProgramName = "mabctl"
 
+var MAB *api.Controller
+
 var cfgFile string
-var adminClient *api.Client
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -47,21 +48,13 @@ var rootCmd = &cobra.Command{
 CLI toolkit for administering a baikal carddav/caldav server.
 `,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-	    switch cmd.Use {
-	    case "version", "config":
-		return
-	    }
-			a, err := api.NewClient(
-				viper.GetString("admin_username"),
-				viper.GetString("admin_password"),
-				viper.GetString("admin_url"),
-				viper.GetString("cert"),
-				viper.GetString("key"),
-				viper.GetString("api_key"),
-				viper.GetBool("insecure"),
-			)
-			cobra.CheckErr(err)
-			adminClient = a
+		switch cmd.Use {
+		case "version", "config":
+			return
+		}
+		var err error
+		MAB, err = api.NewAddressBookController()
+		cobra.CheckErr(err)
 	},
 	//PersistentPostRun: func(cmd *cobra.Command, args []string) {},
 	//Run: func(cmd *cobra.Command, args []string) {},
@@ -85,20 +78,22 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "~/.mabctl", "config file (default is ~/.mabctl)")
 
 	optionSwitch("insecure", "", "disable server certificate validation")
-	optionSwitch("discover", "", "discover carddav endpoint")
-	optionSwitch("terse", "t", "compact text output")
+	optionSwitch("json", "j", "select JSON output")
+	optionSwitch("admin", "", "use BCC admin API")
 	optionSwitch("verbose", "v", "enable diagnostic output")
 	optionSwitch("quiet", "q", "suppress output")
-	optionString("dav-username", "u", "", "username or email address")
-	optionString("dav-password", "p", "", "carddav account password")
-	optionString("cert", "c", "/etc/mabctl/mabctl.pem", "client certificate file")
-	optionString("key", "k", "/etc/mabctl/mabctl.key", "client certificate key file")
 	optionString("dav-url", "", "", "baikal carddav URL")
 	optionString("admin-username", "U", "admin", "baikal admin username")
 	optionString("admin-password", "P", "", "baikal admin password")
-	optionString("bcc-url", "b", "", "bcc API URL")
-	optionString("bcc-key", "a", "", "bcc API key")
+	optionString("admin-url", "", "", "bcc API URL")
+	optionString("api-key", "a", "", "bcc API key")
+	optionString("cert", "c", "/etc/mabctl/mabctl.pem", "client certificate file")
+	optionString("key", "k", "/etc/mabctl/mabctl.key", "client certificate key file")
 
+}
+
+func viperKey(name string) string {
+	return strings.Replace(name, "-", "_", -1)
 }
 
 func optionSwitch(name, flag, description string) {
@@ -107,7 +102,8 @@ func optionSwitch(name, flag, description string) {
 	} else {
 		rootCmd.PersistentFlags().BoolP(name, flag, false, description)
 	}
-	viper.BindPFlag(strings.Replace(name, "-", "_", -1), rootCmd.PersistentFlags().Lookup(name))
+
+	viper.BindPFlag(viperKey(name), rootCmd.PersistentFlags().Lookup(name))
 }
 
 func optionString(name, flag, value, description string) {
@@ -116,7 +112,7 @@ func optionString(name, flag, value, description string) {
 	} else {
 		rootCmd.PersistentFlags().StringP(name, flag, value, description)
 	}
-	viper.BindPFlag(strings.Replace(name, "-", "_", -1), rootCmd.PersistentFlags().Lookup(name))
+	viper.BindPFlag(viperKey(name), rootCmd.PersistentFlags().Lookup(name))
 }
 
 func pathname(filename string) string {
@@ -155,10 +151,25 @@ func initConfig() {
 	}
 
 	err := viper.ReadInConfig()
-	if err == nil && viper.GetBool("verbose") {
-		fmt.Fprintf(os.Stderr, "Configured from file: %v\n", viper.ConfigFileUsed())
+	cobra.CheckErr(err)
+	file := viper.ConfigFileUsed()
+	if file != "" && viper.GetBool("verbose") {
+	    fmt.Fprintf(os.Stderr, "Configured from file: %v\n", file)
 	}
 
+}
+
+func HandleResponse(response interface{}, data interface{}) bool {
+	if viper.GetBool("verbose") {
+		viper.Set("json", true)
+		PrintResponse(response)
+		return true
+	}
+	if viper.GetBool("json") {
+		PrintResponse(data)
+		return true
+	}
+	return false
 }
 
 func PrintMessage(response *api.Response) {
@@ -174,14 +185,11 @@ func PrintResponse(response interface{}) {
 	if viper.GetBool("quiet") {
 		return
 	}
-
-	var out string
-	if viper.GetBool("terse") {
-		out = fmt.Sprintf("%v", response)
-	} else {
+	if viper.GetBool("json") {
 		buf, err := json.MarshalIndent(response, "", "  ")
 		cobra.CheckErr(err)
-		out = string(buf)
+		fmt.Println(string(buf))
+		return
 	}
-	fmt.Println(out)
+	fmt.Println(response)
 }

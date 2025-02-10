@@ -33,7 +33,7 @@ var initCmd = &cobra.Command{
 Initialize and configure a newly installed Baikal server instance.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		response, err := adminClient.Initialize()
+		response, err := MAB.Initialize()
 		cobra.CheckErr(err)
 		PrintMessage(response)
 	},

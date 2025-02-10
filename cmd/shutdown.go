@@ -33,7 +33,7 @@ var shutdownCmd = &cobra.Command{
 Request server shutdown.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		response, err := adminClient.RequestShutdown()
+		response, err := MAB.RequestShutdown()
 		cobra.CheckErr(err)
 		PrintMessage(response)
 	},

@@ -25,22 +25,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var deleteAddressBookCmd = &cobra.Command{
-	Use:   "book USER_EMAIL ADDRESS_BOOK_TOKEN",
-	Short: "delete an address book",
+var passwdCmd = &cobra.Command{
+	Use:   "passwd USERNAME [PASSWORD]",
+	Short: "set or get password",
 	Long: `
-Delete an address book from a user account.
+If PASSWORD is provided, reset the stored password for USERNAME, then output
+the address book password for USERNAME to stdout.
 `,
-	Args: cobra.ExactArgs(2),
+	Args: cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
-		userEmail := args[0]
-		addressBookToken := args[1]
-		response, err := adminClient.DeleteBook(userEmail, addressBookToken)
+		username := args[0]
+		if len(args) > 1 {
+			err := MAB.SetPassword(username, args[1])
+			cobra.CheckErr(err)
+		}
+		password, err := MAB.GetPassword(username)
 		cobra.CheckErr(err)
-		PrintMessage(response)
+		cmd.Println(password)
 	},
 }
 
 func init() {
-	deleteCmd.AddCommand(deleteAddressBookCmd)
+	rootCmd.AddCommand(passwdCmd)
 }

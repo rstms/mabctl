@@ -32,18 +32,27 @@ var booksCmd = &cobra.Command{
 	Long: `
 List address boooks for a user account.
 `,
-	Args: cobra.RangeArgs(0, 1),
+	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		var email string
-		if len(args) > 0 {
-			email = args[0]
-		}
-		response, err := adminClient.GetBooks(email)
-		cobra.CheckErr(err)
-		if viper.GetBool("verbose") {
-			PrintResponse(response)
+		username := args[0]
+		if viper.GetBool("admin") {
+			response, err := MAB.GetBooksAdmin(username)
+			cobra.CheckErr(err)
+			if !HandleResponse(response, response.Books) {
+				for _, book := range response.Books {
+					cmd.Println(book.Token)
+				}
+			}
 		} else {
-			PrintResponse(response.Books)
+			response, err := MAB.GetBooks(username)
+			cobra.CheckErr(err)
+			if !HandleResponse(response, response.Books) {
+			    names, err := response.Names() 
+			    cobra.CheckErr(err)
+			    for _, name:= range names {
+				cmd.Println(name)
+			    }
+			}
 		}
 	},
 }

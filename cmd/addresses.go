@@ -25,21 +25,28 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var deleteUserCmd = &cobra.Command{
-	Use:   "user EMAIL",
-	Short: "delete a user account",
+var addressesCmd = &cobra.Command{
+	Use:   "addresses USERNAME BOOKNAME",
+	Aliases: []string{"ls"},
+	Short: "list email addresses in address book",
 	Long: `
-Delete a user account from the caldav/carddav server.
+Output email addresses from address book identified by USERNAME and BOOKNAME.
 `,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		email := args[0]
-		response, err := adminClient.DeleteUser(email)
+		username := args[0]
+		bookname := args[1]
+		response, err := MAB.Addresses(username, bookname)
 		cobra.CheckErr(err)
-		PrintResponse(response)
+		if !HandleResponse(response, response.Addresses) {
+			for _, addr := range response.Addresses {
+				cmd.Println(addr.Card.Get("EMAIL").Value)
+			}
+		}
+
 	},
 }
 
 func init() {
-	deleteCmd.AddCommand(deleteUserCmd)
+	rootCmd.AddCommand(addressesCmd)
 }

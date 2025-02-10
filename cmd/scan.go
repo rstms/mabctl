@@ -22,38 +22,42 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"os"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-// statusCmd represents the status command
-var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "admin server status",
+var scanCmd = &cobra.Command{
+	Use:   "scan USERNAME EMAIL_ADDRESS",
+	Short: "report address books containing address",
 	Long: `
-Query the admin server status and write to stdout as JSON
+Scan for EMAIL_ADDRESS in all CardDAV address books under the user account
+USERNAME.  Output name of each book containing EMAIL_ADDRESS.  Set exit
+code 0 if at least one book contains the address.
 `,
+	Args: cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		response, err := MAB.GetStatus()
+		username := args[0]
+		email := args[1]
+		exitCode := 1
+		response, err := MAB.ScanAddress(username, email)
 		cobra.CheckErr(err)
-		if viper.GetBool("verbose") {
-			PrintResponse(response)
-		} else {
-			PrintResponse(response.Status)
+		if len(response.Books) > 0 {
+		    exitCode = 0
 		}
+		if ! HandleResponse(response, response.Books) {
+		    if ! viper.GetBool("quiet") {
+			names, err := response.Names()
+			cobra.CheckErr(err)
+			for _, name := range names {
+			    cmd.Println(name)
+			}
+		    }
+		}
+		os.Exit(exitCode)
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(statusCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// statusCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// statusCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.AddCommand(scanCmd)
 }

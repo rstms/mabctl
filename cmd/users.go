@@ -23,37 +23,25 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
-// usersCmd represents the users command
 var usersCmd = &cobra.Command{
 	Use:   "users",
 	Short: "list users",
 	Long: `
-Query all user accounts from carddav admin interface and output as JSON.
+Query admin interface and output a list of all user accounts
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		response, err := adminClient.GetUsers()
+		response, err := MAB.GetUsers()
 		cobra.CheckErr(err)
-		if viper.GetBool("verbose") {
-			PrintResponse(response)
-		} else {
-			PrintResponse(response.Users)
+		if !HandleResponse(response, response.Users) {
+			for _, user := range response.Users {
+				cmd.Println(user.UserName)
+			}
 		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(usersCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// usersCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// usersCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

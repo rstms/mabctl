@@ -32,7 +32,7 @@ var resetCmd = &cobra.Command{
 Stop and restart the browser instance used by the baikalctl admin interface.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		response, err := adminClient.Reset()
+		response, err := MAB.Reset()
 		cobra.CheckErr(err)
 		PrintMessage(response)
 	},

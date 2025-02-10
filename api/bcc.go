@@ -2,9 +2,9 @@ package api
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/emersion/go-webdav/carddav"
 	"github.com/rstms/mabctl/util"
 	"io/ioutil"
 	"net/http"
@@ -15,7 +15,7 @@ type ErrorMessage struct {
 	Error string `json:"error"`
 }
 
-type Client struct {
+type Controller struct {
 	username string
 	password string
 	url      string
@@ -56,9 +56,26 @@ type AddUserResponse struct {
 	User User `json:"user"`
 }
 
-type BooksResponse struct {
+type AdminBooksResponse struct {
 	Response
 	Books []Book `json:"books"`
+}
+
+type BooksResponse struct {
+	Response
+	Books []carddav.AddressBook `json:"books"`
+}
+
+func (b *BooksResponse)Names() ([]string, error) {
+    ret := make([]string, len(b.Books))
+    for i, book := range b.Books {
+	_, name, err := util.ParseBookPath("", book.Path)
+	if err != nil {
+	    return []string{}, err
+	}
+	ret[i]=name
+    }
+    return ret, nil
 }
 
 type AddBookResponse struct {
@@ -74,6 +91,16 @@ type StatusResponse struct {
 type ErrorResponse struct {
 	Response
 	Detail string `json:"detail"`
+}
+
+type AddressesResponse struct {
+	Response
+	Addresses []carddav.AddressObject `json:"addresses"`
+}
+
+type AddressResponse struct {
+	Response
+	Address carddav.AddressObject `json:"address"`
 }
 
 func Format(data interface{}) (string, error) {
@@ -100,27 +127,7 @@ func FormatIfJSON(body []byte) string {
 	return string(formatted)
 }
 
-func NewClient(username, password, url, cert, key, apikey string, insecure bool) (*Client, error) {
-	c := Client{username, password, url, cert, key, apikey, nil}
-
-	clientCert, err := tls.LoadX509KeyPair(cert, key)
-	if err != nil {
-		return nil, util.Fatalf("failed loading client certificate: %v", err)
-	}
-
-	tlsConfig := &tls.Config{Certificates: []tls.Certificate{clientCert},
-		InsecureSkipVerify: insecure,
-	}
-	c.client = &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: tlsConfig,
-		},
-	}
-
-	return &c, nil
-}
-
-func (c *Client) request(method, path string, data *[]byte) (*http.Request, error) {
+func (c *Controller) request(method, path string, data *[]byte) (*http.Request, error) {
 	var body *bytes.Buffer
 	if data == nil {
 		body = bytes.NewBuffer([]byte{})
@@ -140,7 +147,7 @@ func (c *Client) request(method, path string, data *[]byte) (*http.Request, erro
 	return req, nil
 }
 
-func (c *Client) get(path string, ret interface{}) error {
+func (c *Controller) get(path string, ret interface{}) error {
 	req, err := c.request("GET", path, nil)
 	if err != nil {
 		return err
@@ -153,7 +160,7 @@ func (c *Client) get(path string, ret interface{}) error {
 	return c.handleResponse("GET", path, resp, ret)
 }
 
-func (c *Client) post(path string, data *[]byte, ret interface{}) error {
+func (c *Controller) post(path string, data *[]byte, ret interface{}) error {
 	req, err := c.request("POST", path, data)
 	if err != nil {
 		return err
@@ -166,7 +173,7 @@ func (c *Client) post(path string, data *[]byte, ret interface{}) error {
 	return c.handleResponse("POST", path, resp, ret)
 }
 
-func (c *Client) del(path string, data *[]byte, ret interface{}) error {
+func (c *Controller) del(path string, data *[]byte, ret interface{}) error {
 	req, err := c.request("DELETE", path, data)
 	if err != nil {
 		return err
@@ -179,7 +186,7 @@ func (c *Client) del(path string, data *[]byte, ret interface{}) error {
 	return c.handleResponse("DELETE", path, resp, ret)
 }
 
-func (c *Client) handleResponse(method, path string, resp *http.Response, ret interface{}) error {
+func (c *Controller) handleResponse(method, path string, resp *http.Response, ret interface{}) error {
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return util.Fatalf("%s %s failed reading response body: %v", method, path, err)
@@ -197,7 +204,7 @@ func (c *Client) handleResponse(method, path string, resp *http.Response, ret in
 	return nil
 }
 
-func (c *Client) Initialize() (*Response, error) {
+func (c *Controller) Initialize() (*Response, error) {
 	var ret Response
 	err := c.post("/initialize/", nil, &ret)
 	if err != nil {
@@ -206,7 +213,7 @@ func (c *Client) Initialize() (*Response, error) {
 	return &ret, nil
 }
 
-func (c *Client) Reset() (*Response, error) {
+func (c *Controller) Reset() (*Response, error) {
 	var ret Response
 	err := c.post("/reset/", nil, &ret)
 	if err != nil {
@@ -215,7 +222,7 @@ func (c *Client) Reset() (*Response, error) {
 	return &ret, nil
 }
 
-func (c *Client) GetStatus() (*StatusResponse, error) {
+func (c *Controller) GetStatus() (*StatusResponse, error) {
 	var ret StatusResponse
 	err := c.get("/status/", &ret)
 	if err != nil {
@@ -224,7 +231,7 @@ func (c *Client) GetStatus() (*StatusResponse, error) {
 	return &ret, nil
 }
 
-func (c *Client) GetUptime() (*Response, error) {
+func (c *Controller) GetUptime() (*Response, error) {
 	var ret Response
 	err := c.get("/uptime/", &ret)
 	if err != nil {
@@ -233,7 +240,7 @@ func (c *Client) GetUptime() (*Response, error) {
 	return &ret, nil
 }
 
-func (c *Client) RequestShutdown() (*Response, error) {
+func (c *Controller) RequestShutdown() (*Response, error) {
 	var ret Response
 	err := c.post("/shutdown/", nil, &ret)
 	if err != nil {
@@ -242,7 +249,7 @@ func (c *Client) RequestShutdown() (*Response, error) {
 	return &ret, nil
 }
 
-func (c *Client) GetUsers() (*UsersResponse, error) {
+func (c *Controller) GetUsers() (*UsersResponse, error) {
 	var ret UsersResponse
 	err := c.get("/users/", &ret)
 	if err != nil {
@@ -251,8 +258,8 @@ func (c *Client) GetUsers() (*UsersResponse, error) {
 	return &ret, nil
 }
 
-func (c *Client) GetBooks(username string) (*BooksResponse, error) {
-	var ret BooksResponse
+func (c *Controller) GetBooksAdmin(username string) (*AdminBooksResponse, error) {
+	var ret AdminBooksResponse
 	var err error
 	if username == "" {
 		err = c.get("/books/", &ret)
@@ -265,7 +272,7 @@ func (c *Client) GetBooks(username string) (*BooksResponse, error) {
 	return &ret, nil
 }
 
-func (c *Client) AddUser(username, display, password string) (*AddUserResponse, error) {
+func (c *Controller) AddUser(username, display, password string) (*AddUserResponse, error) {
 	user := map[string]string{
 		"username":    username,
 		"displayname": display,
@@ -283,7 +290,7 @@ func (c *Client) AddUser(username, display, password string) (*AddUserResponse, 
 	return &ret, nil
 }
 
-func (c *Client) AddBook(email, name, description string) (*AddBookResponse, error) {
+func (c *Controller) AddBook(email, name, description string) (*AddBookResponse, error) {
 	book := map[string]string{
 		"username":    email,
 		"bookname":    name,
@@ -301,7 +308,7 @@ func (c *Client) AddBook(email, name, description string) (*AddBookResponse, err
 	return &ret, nil
 }
 
-func (c *Client) DeleteUser(email string) (*Response, error) {
+func (c *Controller) DeleteUser(email string) (*Response, error) {
 	user := map[string]string{
 		"username": email,
 	}
@@ -317,7 +324,8 @@ func (c *Client) DeleteUser(email string) (*Response, error) {
 	return &ret, nil
 }
 
-func (c *Client) DeleteBook(username, token string) (*Response, error) {
+func (c *Controller) DeleteBook(username, bookname string) (*Response, error) {
+	token := util.BookToken(username, bookname)
 	user := map[string]string{
 		"username": username,
 		"token":    token,
@@ -333,3 +341,122 @@ func (c *Client) DeleteBook(username, token string) (*Response, error) {
 	}
 	return &ret, nil
 }
+
+func (c *Controller) Addresses(username, bookname string) (*AddressesResponse, error) {
+	dav, err := c.davClient(username)
+	if err != nil {
+		return nil, err
+	}
+
+	addrs, err := dav.Addresses(bookname)
+	if err != nil {
+		return nil, err
+	}
+	response := AddressesResponse{}
+	response.Success = true
+	response.Request = "CardDAV address query"
+	response.Message = fmt.Sprintf("%s %s addresses", username, bookname)
+	response.Addresses = *addrs
+	return &response, nil
+}
+
+func (c *Controller) GetBooks(username string) (*BooksResponse, error) {
+	dav, err := c.davClient(username)
+	if err != nil {
+		return nil, err
+	}
+	books, err := dav.List()
+	if err != nil {
+		return nil, err
+	}
+	response := BooksResponse{}
+	response.Success = true
+	response.Request = "CardDAV address books query"
+	response.Message = fmt.Sprintf("%s books", username)
+	response.Books = *books
+	return &response, nil
+
+}
+
+func (c *Controller) AddAddress(username, bookname, email, name string) (*AddressResponse, error) {
+	dav, err := c.davClient(username)
+	if err != nil {
+		return nil, err
+	}
+	added, err := dav.AddAddress(bookname, email, name)
+	if err != nil {
+		return nil, err
+	}
+	response := AddressResponse{}
+	response.Success = true
+	response.Request = fmt.Sprintf("Add CardDAV address: %s", email)
+	response.Message = fmt.Sprintf("added %s", email)
+	response.Address = *added
+	return &response, nil
+
+}
+
+
+func (c *Controller) DeleteAddress(username, bookname, email string) (*AddressesResponse, error) {
+	dav, err := c.davClient(username)
+	if err != nil {
+		return nil, err
+	}
+	deleted, err := dav.DeleteAddress(bookname, email)
+	if err != nil {
+		return nil, err
+	}
+	response := AddressesResponse{}
+	response.Success = true
+	response.Request = fmt.Sprintf("Delete CardDAV address: %s", email)
+	if len(*deleted) == 0 {
+	    response.Message = fmt.Sprintf("not found: %s", email)
+	} else {
+	    response.Message = fmt.Sprintf("deleted: %d", len(*deleted))
+	}
+	response.Addresses = *deleted
+	return &response, nil
+}
+func (c *Controller) QueryAddress(username, bookname, email string) (*AddressesResponse, error) {
+	dav, err := c.davClient(username)
+	if err != nil {
+		return nil, err
+	}
+	found, err := dav.QueryAddress(bookname, email)
+	if err != nil {
+		return nil, err
+	}
+	response := AddressesResponse{}
+	response.Success = true
+	response.Request = fmt.Sprintf("Query CardDAV address: %s", email)
+	if len(*found) == 0 {
+	    response.Message = fmt.Sprintf("not found: %s", email)
+	} else {
+	    response.Message = fmt.Sprintf("found: %d", len(*found))
+	}
+	response.Addresses = *found
+	return &response, nil
+}
+
+// return books containing address
+func (c *Controller) ScanAddress(username, email string) (*BooksResponse, error) {
+	dav, err := c.davClient(username)
+	if err != nil {
+		return nil, err
+	}
+	books, err := dav.ScanAddress(email)
+	if err != nil {
+		return nil, err
+	}
+	response := BooksResponse{}
+	response.Success = true
+	response.Request = fmt.Sprintf("Scan books for CardDAV address: %s", email)
+	if len(*books) == 0 {
+	    response.Message = fmt.Sprintf("not found: %s", email)
+	} else {
+	    response.Message = fmt.Sprintf("found: %d", len(*books))
+	}
+	response.Books = *books
+	return &response, nil
+}
+

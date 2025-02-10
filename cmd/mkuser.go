@@ -25,22 +25,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// delCmd represents the del command
-var deleteCmd = &cobra.Command{
-	Use:   "delete ...",
-	Short: "delete items",
+var mkuserCmd = &cobra.Command{
+	Use:   "mkuser EMAIL DISPLAY_NAME PASSWORD",
+	Short: "add a user account",
+	Long: `
+Add a user account to the caldav/carddav server.  Usernames are email
+addresses by convention.  The display name will be visible to the user.
+`,
+	Args: cobra.ExactArgs(3),
+	Run: func(cmd *cobra.Command, args []string) {
+		email := args[0]
+		display := args[1]
+		password := args[2]
+		response, err := MAB.AddUser(email, display, password)
+		cobra.CheckErr(err)
+		if !HandleResponse(response, response.User) {
+			cmd.Println(response.User.URI)
+		}
+	},
 }
 
 func init() {
-	rootCmd.AddCommand(deleteCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// delCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// delCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.AddCommand(mkuserCmd)
 }

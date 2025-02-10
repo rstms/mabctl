@@ -23,37 +23,23 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
-// statusCmd represents the status command
-var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "admin server status",
+var rmuserCmd = &cobra.Command{
+	Use:   "rmuser USERNAME",
+	Short: "delete a user account",
 	Long: `
-Query the admin server status and write to stdout as JSON
+Delete the CardDAV account for USERNAME including all address books.
 `,
+	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		response, err := MAB.GetStatus()
+		username := args[0]
+		response, err := MAB.DeleteUser(username)
 		cobra.CheckErr(err)
-		if viper.GetBool("verbose") {
-			PrintResponse(response)
-		} else {
-			PrintResponse(response.Status)
-		}
+		PrintResponse(response)
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(statusCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// statusCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// statusCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.AddCommand(rmuserCmd)
 }

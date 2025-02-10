@@ -23,30 +23,25 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
-var addBookCmd = &cobra.Command{
-	Use:   "book EMAIL NAME DESCRIPTION",
+var mkbookCmd = &cobra.Command{
+	Use:   "mkbook USERNAME BOOKNAME DESCRIPTION",
 	Short: "add addressbook",
 	Long: `
-Add a new address book to an existing user account.
+Add a new CardDAV address book for USERNAME 
 `,
 	Args: cobra.ExactArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
-		email := args[0]
-		name := args[1]
+		username := args[0]
+		bookname := args[1]
 		description := args[2]
-		response, err := adminClient.AddBook(email, name, description)
+		response, err := MAB.AddBook(username, bookname, description)
 		cobra.CheckErr(err)
-		if viper.GetBool("verbose") {
-			PrintResponse(response)
-		} else {
-			PrintResponse(response.Book)
-		}
+		HandleResponse(response, response.Book)
 	},
 }
 
 func init() {
-	addCmd.AddCommand(addBookCmd)
+	rootCmd.AddCommand(mkbookCmd)
 }

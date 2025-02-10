@@ -25,10 +25,11 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var userCmd = &cobra.Command{
-	Use:   "user EMAIL",
+	Use:   "user USERNAME",
 	Short: "display a user",
 	Long: `
 Output JSON data for a user account.  Sets exit code non-zero on error.
@@ -37,11 +38,15 @@ Can be used to determine user existence.
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		username := args[0]
-		response, err := adminClient.GetUsers()
+		response, err := MAB.GetUsers()
 		cobra.CheckErr(err)
 		for _, user := range response.Users {
 			if user.UserName == username {
-				PrintResponse(&user)
+				if viper.GetBool("json") {
+					PrintResponse(&user)
+				} else {
+					cmd.Println(user.UserName)
+				}
 				os.Exit(0)
 			}
 		}
