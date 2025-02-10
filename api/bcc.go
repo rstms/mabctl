@@ -287,6 +287,10 @@ func (c *Controller) AddUser(username, display, password string) (*AddUserRespon
 	if err != nil {
 		return nil, err
 	}
+	err = c.SetPassword(username, password)
+	if err != nil {
+		return nil, err
+	}
 	return &ret, nil
 }
 
