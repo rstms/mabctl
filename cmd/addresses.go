@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"fmt"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +41,7 @@ Output email addresses from address book identified by USERNAME and BOOKNAME.
 		cobra.CheckErr(err)
 		if !HandleResponse(response, response.Addresses) {
 			for _, addr := range response.Addresses {
-				cmd.Println(addr.Card.Get("EMAIL").Value)
+				fmt.Println(addr.Card.Get("EMAIL").Value)
 			}
 		}
 

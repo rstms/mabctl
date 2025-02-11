@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"os"
+	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -44,7 +45,7 @@ USERNAME. Output matching records. Set exit code 0 if at least one record exists
 		if !HandleResponse(response, response.Addresses) {
 		    if ! viper.GetBool("quiet") {
 			for _, addr := range response.Addresses {
-			    cmd.Println(addr.Path)
+			    fmt.Println(addr.Path)
 			}
 		    }
 		}

@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+    "fmt"
 	"github.com/spf13/cobra"
 )
 
@@ -36,7 +37,7 @@ Query admin interface and output a list of all user accounts
 		cobra.CheckErr(err)
 		if !HandleResponse(response, response.Users) {
 			for _, user := range response.Users {
-				cmd.Println(user.UserName)
+				fmt.Println(user.UserName)
 			}
 		}
 	},

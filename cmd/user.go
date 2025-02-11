@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"os"
+	"fmt"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -45,7 +46,7 @@ Can be used to determine user existence.
 				if viper.GetBool("json") {
 					PrintResponse(&user)
 				} else {
-					cmd.Println(user.UserName)
+					fmt.Println(user.UserName)
 				}
 				os.Exit(0)
 			}

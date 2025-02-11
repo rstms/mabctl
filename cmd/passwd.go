@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+    "fmt"
 	"github.com/spf13/cobra"
 )
 
@@ -41,7 +42,7 @@ the address book password for USERNAME to stdout.
 		}
 		password, err := MAB.GetPassword(username)
 		cobra.CheckErr(err)
-		cmd.Println(password)
+		fmt.Println(password)
 	},
 }
 

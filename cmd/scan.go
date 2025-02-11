@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"os"
+	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -50,7 +51,7 @@ code 0 if at least one book contains the address.
 			names, err := response.Names()
 			cobra.CheckErr(err)
 			for _, name := range names {
-			    cmd.Println(name)
+			    fmt.Println(name)
 			}
 		    }
 		}

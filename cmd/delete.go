@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
+	"fmt"
 )
 
 var deleteCmd = &cobra.Command{
@@ -41,24 +42,8 @@ account USERNAME
 		cobra.CheckErr(err)
 		if !HandleResponse(response, response.Addresses) {
 		    for _, address := range response.Addresses {
-			cmd.Println(address.Path)
+			fmt.Println(address.Path)
 		    }
-		    /*
-		    cmd.Printf("response: %v\n", response)
-		    cmd.Printf("response.Address: %v\n", response.Address)
-		    cmd.Printf("response.Address.Card: %v\n", response.Address.Card)
-		    cmd.Printf("response.Address.Card.Get(EMAIL): %v\n", response.Address.Card.Get("EMAIL"))
-		    for k, v := range response.Address.Card {
-			cmd.Printf("%v %v\n", k, v)
-		    }
-		    card := response.Address.Card
-		    field := card.Get("UID") 
-		    if field != nil {
-			cmd.Printf("%s.vcf\n", field.Value)
-		    } else {
-			cobra.CheckErr(fmt.Errorf("unexpected response: %+v", response))
-		    }
-		    */
 		}
 	},
 }

@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+    "fmt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -40,7 +41,7 @@ List address boooks for a user account.
 			cobra.CheckErr(err)
 			if !HandleResponse(response, response.Books) {
 				for _, book := range response.Books {
-					cmd.Println(book.Token)
+					fmt.Println(book.Token)
 				}
 			}
 		} else {
@@ -50,7 +51,7 @@ List address boooks for a user account.
 			    names, err := response.Names() 
 			    cobra.CheckErr(err)
 			    for _, name:= range names {
-				cmd.Println(name)
+				fmt.Println(name)
 			    }
 			}
 		}

@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"fmt"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +41,7 @@ addresses by convention.  The display name will be visible to the user.
 		response, err := MAB.AddUser(email, display, password)
 		cobra.CheckErr(err)
 		if !HandleResponse(response, response.User) {
-			cmd.Println(response.User.URI)
+			fmt.Println(response.User.URI)
 		}
 	},
 }
