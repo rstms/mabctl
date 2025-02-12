@@ -22,8 +22,8 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"github.com/spf13/cobra"
 	"fmt"
+	"github.com/spf13/cobra"
 )
 
 var deleteCmd = &cobra.Command{
@@ -41,9 +41,9 @@ account USERNAME
 		response, err := MAB.DeleteAddress(username, bookname, email)
 		cobra.CheckErr(err)
 		if !HandleResponse(response, response.Addresses) {
-		    for _, address := range response.Addresses {
-			fmt.Printf("Deleted: %s\n", address.Path)
-		    }
+			for _, address := range response.Addresses {
+				fmt.Printf("Deleted: %s\n", address.Path)
+			}
 		}
 	},
 }

@@ -22,7 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
-    "fmt"
+	"fmt"
 	"github.com/spf13/cobra"
 )
 

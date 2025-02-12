@@ -154,7 +154,7 @@ func initConfig() {
 	cobra.CheckErr(err)
 	file := viper.ConfigFileUsed()
 	if file != "" && viper.GetBool("verbose") {
-	    fmt.Fprintf(os.Stderr, "Configured from file: %v\n", file)
+		fmt.Fprintf(os.Stderr, "Configured from file: %v\n", file)
 	}
 
 }

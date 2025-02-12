@@ -22,10 +22,10 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"os"
 	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"os"
 )
 
 var getCmd = &cobra.Command{
@@ -43,15 +43,15 @@ USERNAME. Output matching records. Set exit code 0 if at least one record exists
 		response, err := MAB.QueryAddress(username, bookname, email)
 		cobra.CheckErr(err)
 		if !HandleResponse(response, response.Addresses) {
-		    if ! viper.GetBool("quiet") {
-			for _, addr := range response.Addresses {
-			    fmt.Println(addr.Path)
+			if !viper.GetBool("quiet") {
+				for _, addr := range response.Addresses {
+					fmt.Println(addr.Path)
+				}
 			}
-		    }
 		}
 		exitCode := 1
 		if len(response.Addresses) > 0 {
-		    exitCode = 0
+			exitCode = 0
 		}
 		os.Exit(exitCode)
 	},

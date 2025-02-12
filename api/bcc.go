@@ -21,8 +21,6 @@ type Controller struct {
 	username string
 	password string
 	url      string
-	cert     string
-	key      string
 	apikey   string
 	client   *http.Client
 }
@@ -68,16 +66,16 @@ type BooksResponse struct {
 	Books []carddav.AddressBook `json:"books"`
 }
 
-func (b *BooksResponse)Names() ([]string, error) {
-    ret := make([]string, len(b.Books))
-    for i, book := range b.Books {
-	_, name, err := util.ParseBookPath("", book.Path)
-	if err != nil {
-	    return []string{}, err
+func (b *BooksResponse) Names() ([]string, error) {
+	ret := make([]string, len(b.Books))
+	for i, book := range b.Books {
+		_, name, err := util.ParseBookPath("", book.Path)
+		if err != nil {
+			return []string{}, err
+		}
+		ret[i] = name
 	}
-	ret[i]=name
-    }
-    return ret, nil
+	return ret, nil
 }
 
 type AddBookResponse struct {
@@ -277,13 +275,13 @@ func (c *Controller) GetBooksAdmin(username string) (*AdminBooksResponse, error)
 func (c *Controller) AddUser(username, display, password string) (*AddUserResponse, error) {
 	var err error
 	if display == "" {
-	    display = username
+		display = username
 	}
 	if password == "" {
-	    password, err = mkpasswd(PASSWORD_LENGTH)
-	    if err != nil {
-		return nil, util.Fatalf("failed generating password: %v", err)
-	    }
+		password, err = mkpasswd(PASSWORD_LENGTH)
+		if err != nil {
+			return nil, util.Fatalf("failed generating password: %v", err)
+		}
 	}
 	user := map[string]string{
 		"username":    username,
@@ -308,7 +306,7 @@ func (c *Controller) AddUser(username, display, password string) (*AddUserRespon
 
 func (c *Controller) AddBook(email, name, description string) (*AddBookResponse, error) {
 	if description == "" {
-	    description = name
+		description = name
 	}
 	book := map[string]string{
 		"username":    email,
@@ -327,9 +325,9 @@ func (c *Controller) AddBook(email, name, description string) (*AddBookResponse,
 	return &ret, nil
 }
 
-func (c *Controller) DeleteUser(email string) (*Response, error) {
+func (c *Controller) DeleteUser(username string) (*Response, error) {
 	user := map[string]string{
-		"username": email,
+		"username": username,
 	}
 	jsonData, err := json.Marshal(user)
 	if err != nil {
@@ -337,6 +335,10 @@ func (c *Controller) DeleteUser(email string) (*Response, error) {
 	}
 	var ret Response
 	err = c.del("/user/", &jsonData, &ret)
+	if err != nil {
+		return nil, err
+	}
+	err = c.DeletePassword(username)
 	if err != nil {
 		return nil, err
 	}
@@ -355,10 +357,6 @@ func (c *Controller) DeleteBook(username, bookname string) (*Response, error) {
 	}
 	var ret Response
 	err = c.del("/book/", &jsonData, &ret)
-	if err != nil {
-		return nil, err
-	}
-	err = c.DeletePassword(username)
 	if err != nil {
 		return nil, err
 	}
@@ -419,7 +417,6 @@ func (c *Controller) AddAddress(username, bookname, email, name string) (*Addres
 
 }
 
-
 func (c *Controller) DeleteAddress(username, bookname, email string) (*AddressesResponse, error) {
 	dav, err := c.davClient(username)
 	if err != nil {
@@ -433,9 +430,9 @@ func (c *Controller) DeleteAddress(username, bookname, email string) (*Addresses
 	response.Success = true
 	response.Request = fmt.Sprintf("Delete CardDAV address: %s", email)
 	if len(*deleted) == 0 {
-	    response.Message = fmt.Sprintf("not found: %s", email)
+		response.Message = fmt.Sprintf("not found: %s", email)
 	} else {
-	    response.Message = fmt.Sprintf("deleted: %d", len(*deleted))
+		response.Message = fmt.Sprintf("deleted: %d", len(*deleted))
 	}
 	response.Addresses = *deleted
 	return &response, nil
@@ -453,9 +450,9 @@ func (c *Controller) QueryAddress(username, bookname, email string) (*AddressesR
 	response.Success = true
 	response.Request = fmt.Sprintf("Query CardDAV address: %s", email)
 	if len(*found) == 0 {
-	    response.Message = fmt.Sprintf("not found: %s", email)
+		response.Message = fmt.Sprintf("not found: %s", email)
 	} else {
-	    response.Message = fmt.Sprintf("found: %d", len(*found))
+		response.Message = fmt.Sprintf("found: %d", len(*found))
 	}
 	response.Addresses = *found
 	return &response, nil
@@ -475,11 +472,10 @@ func (c *Controller) ScanAddress(username, email string) (*BooksResponse, error)
 	response.Success = true
 	response.Request = fmt.Sprintf("Scan books for CardDAV address: %s", email)
 	if len(*books) == 0 {
-	    response.Message = fmt.Sprintf("not found: %s", email)
+		response.Message = fmt.Sprintf("not found: %s", email)
 	} else {
-	    response.Message = fmt.Sprintf("found: %d", len(*books))
+		response.Message = fmt.Sprintf("found: %d", len(*books))
 	}
 	response.Books = *books
 	return &response, nil
 }
-

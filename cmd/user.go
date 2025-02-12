@@ -22,8 +22,8 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"os"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -42,10 +42,10 @@ Can be used to determine user existence.
 		cobra.CheckErr(err)
 		for _, user := range response.Users {
 			if user.UserName == username {
-			    if ! HandleResponse(&user, &user.UserName) {
-				fmt.Println(user.UserName)
-			    }
-			    os.Exit(0)
+				if !HandleResponse(&user, &user.UserName) {
+					fmt.Println(user.UserName)
+				}
+				os.Exit(0)
 			}
 		}
 		os.Exit(1)

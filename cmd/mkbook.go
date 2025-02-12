@@ -31,13 +31,13 @@ var mkbookCmd = &cobra.Command{
 	Long: `
 Add a new CardDAV address book for USERNAME 
 `,
-	Args: cobra.RangeArgs(2,3),
+	Args: cobra.RangeArgs(2, 3),
 	Run: func(cmd *cobra.Command, args []string) {
 		username := args[0]
 		bookname := args[1]
 		description := ""
 		if len(args) > 2 {
-		    description = args[2]
+			description = args[2]
 		}
 		response, err := MAB.AddBook(username, bookname, description)
 		cobra.CheckErr(err)

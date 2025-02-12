@@ -22,10 +22,10 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"os"
 	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"os"
 )
 
 var scanCmd = &cobra.Command{
@@ -44,16 +44,16 @@ code 0 if at least one book contains the address.
 		response, err := MAB.ScanAddress(username, email)
 		cobra.CheckErr(err)
 		if len(response.Books) > 0 {
-		    exitCode = 0
+			exitCode = 0
 		}
-		if ! HandleResponse(response, response.Books) {
-		    if ! viper.GetBool("quiet") {
-			names, err := response.Names()
-			cobra.CheckErr(err)
-			for _, name := range names {
-			    fmt.Println(name)
+		if !HandleResponse(response, response.Books) {
+			if !viper.GetBool("quiet") {
+				names, err := response.Names()
+				cobra.CheckErr(err)
+				for _, name := range names {
+					fmt.Println(name)
+				}
 			}
-		    }
 		}
 		os.Exit(exitCode)
 	},

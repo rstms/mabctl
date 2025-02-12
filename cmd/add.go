@@ -33,19 +33,19 @@ var addCmd = &cobra.Command{
 Add an email address to the CardDAV address book BOOKNAME under the user
 account USERNAME
 `,
-	Args: cobra.RangeArgs(3,4),
+	Args: cobra.RangeArgs(3, 4),
 	Run: func(cmd *cobra.Command, args []string) {
 		username := args[0]
 		bookname := args[1]
 		email := args[2]
 		name := email
 		if len(args) > 3 {
-		    name = args[3]
+			name = args[3]
 		}
 		response, err := MAB.AddAddress(username, bookname, email, name)
 		cobra.CheckErr(err)
 		if !HandleResponse(response, response.Address) {
-		    fmt.Println(response.Address.Path)
+			fmt.Println(response.Address.Path)
 		}
 	},
 }

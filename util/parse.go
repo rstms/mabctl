@@ -1,9 +1,9 @@
 package util
 
 import (
-    "unicode"
 	"fmt"
 	"strings"
+	"unicode"
 )
 
 // return username, bookname from token
@@ -22,38 +22,37 @@ func ParseBookToken(username, token string) (string, string, error) {
 
 // return book token from username, bookname
 func BookToken(username, bookname string) string {
-    if bookname == "default" {
-	return bookname
-    }
-    raw := username + "-" + bookname
-    token := ""
-    for _, char := range raw {
-	if unicode.IsUpper(char) {
-	    char = unicode.ToLower(char)
+	if bookname == "default" {
+		return bookname
 	}
-	if unicode.IsLower(char) || unicode.IsDigit(char) {
-	    token = token + string(char)
-	} else {
-	    token = token + "-" 
+	raw := username + "-" + bookname
+	token := ""
+	for _, char := range raw {
+		if unicode.IsUpper(char) {
+			char = unicode.ToLower(char)
+		}
+		if unicode.IsLower(char) || unicode.IsDigit(char) {
+			token = token + string(char)
+		} else {
+			token = token + "-"
+		}
 	}
-    }
-    return token
+	return token
 }
 
 // return username, bookname from book path
 func ParseBookPath(username, path string) (string, string, error) {
-    fields := strings.SplitN(path, "/", -1)
-    if len(fields) < 3 {
-	return "", "", Fatalf("unexpected book path: %s", path)
-    }
-    token := fields[len(fields)-2]
-    username, bookname, err := ParseBookToken(username, token)
-    if err != nil {
-	return "", "", err
-    }
-    return username, bookname, nil
+	fields := strings.SplitN(path, "/", -1)
+	if len(fields) < 3 {
+		return "", "", Fatalf("unexpected book path: %s", path)
+	}
+	token := fields[len(fields)-2]
+	username, bookname, err := ParseBookToken(username, token)
+	if err != nil {
+		return "", "", err
+	}
+	return username, bookname, nil
 }
-
 
 // return book URI given username, bookname
 func BookURI(username, bookname string) string {
@@ -61,5 +60,3 @@ func BookURI(username, bookname string) string {
 	bookURI := fmt.Sprintf("/dav.php/addressbooks/%s/%s/", username, token)
 	return bookURI
 }
-
-

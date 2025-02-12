@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/rstms/mabctl/api"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -39,6 +40,8 @@ Output configuration in YAML format."
 		tempfile, err := os.CreateTemp("", "temp-config-*")
 		cobra.CheckErr(err)
 		defer os.Remove(tempfile.Name())
+		err = api.SetDefaults()
+		cobra.CheckErr(err)
 		err = viper.WriteConfigAs(tempfile.Name())
 		cobra.CheckErr(err)
 		data, err := os.ReadFile(tempfile.Name())

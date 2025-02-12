@@ -3,9 +3,9 @@ package carddav
 import (
 	"context"
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/emersion/go-vcard"
 	"github.com/emersion/go-webdav/carddav"
+	"github.com/google/uuid"
 	"github.com/rstms/mabctl/util"
 	"github.com/studio-b12/gowebdav"
 	"net/http"
@@ -66,10 +66,10 @@ func (c *DigestAuthorizedClient) Do(req *http.Request) (*http.Response, error) {
 }
 
 type CardClient struct {
-	url    string
+	url      string
 	username string
-	client *DigestAuthorizedClient
-	dav    *carddav.Client
+	client   *DigestAuthorizedClient
+	dav      *carddav.Client
 }
 
 func NewClient(username, password, url string) (*CardClient, error) {
@@ -137,37 +137,37 @@ func (c *CardClient) Addresses(bookname string) (*[]carddav.AddressObject, error
 }
 
 func GetAddressEmail(address carddav.AddressObject) (string, error) {
-    card := address.Card
-    field := card.Get("EMAIL")
-    if field != nil {
-	return field.Value, nil
-    }
-    return "", util.Fatalf("null email address in %+v", address)
+	card := address.Card
+	field := card.Get("EMAIL")
+	if field != nil {
+		return field.Value, nil
+	}
+	return "", util.Fatalf("null email address in %+v", address)
 }
 
 func GetAddressUUID(address carddav.AddressObject) (string, error) {
-    card := address.Card
-    field := card.Get("UID")
-    if field != nil {
-	return field.Value, nil
-    }
-    return "", util.Fatalf("null UUID in %+v", address)
+	card := address.Card
+	field := card.Get("UID")
+	if field != nil {
+		return field.Value, nil
+	}
+	return "", util.Fatalf("null UUID in %+v", address)
 }
 
 func (c *CardClient) AddAddress(bookname, email, name string) (*carddav.AddressObject, error) {
 	// if email is present in bookname, return existing object
 	addrs, err := c.Addresses(bookname)
 	if err != nil {
-	    return nil, err
+		return nil, err
 	}
 	for _, addr := range *addrs {
-	    addrEmail, err := GetAddressEmail(addr)
-	    if err != nil {
-		return nil, err
-	    }
-	    if addrEmail == email {
-		return &addr, nil
-	    }
+		addrEmail, err := GetAddressEmail(addr)
+		if err != nil {
+			return nil, err
+		}
+		if addrEmail == email {
+			return &addr, nil
+		}
 	}
 	ctx := context.Background()
 	uuid := uuid.New()
@@ -180,34 +180,34 @@ func (c *CardClient) AddAddress(bookname, email, name string) (*carddav.AddressO
 	firstName, lastName, found := strings.Cut(name, " ")
 	nameField := vcard.Name{}
 	if found {
-	    nameField.GivenName = firstName
-	    nameField.FamilyName = lastName
+		nameField.GivenName = firstName
+		nameField.FamilyName = lastName
 	} else {
-	    nameField.AdditionalName = name
+		nameField.AdditionalName = name
 	}
 	card.SetName(&nameField)
 	_, err = c.dav.PutAddressObject(ctx, path, card)
 	if err != nil {
-	    return nil, err
+		return nil, err
 	}
 	query := carddav.AddressBookQuery{
-	    PropFilters: []carddav.PropFilter{ 
-		carddav.PropFilter{
-		    Name: "UID",
-		    TextMatches: []carddav.TextMatch{
-			carddav.TextMatch{
-			    Text: uuid.String(),
-			    },
+		PropFilters: []carddav.PropFilter{
+			carddav.PropFilter{
+				Name: "UID",
+				TextMatches: []carddav.TextMatch{
+					carddav.TextMatch{
+						Text: uuid.String(),
+					},
+				},
 			},
-		    },
 		},
-	    }
+	}
 	created, err := c.dav.QueryAddressBook(ctx, uri, &query)
 	if err != nil {
-	    return nil, err
+		return nil, err
 	}
 	if len(created) != 1 {
-	    return nil, util.Fatalf("unexpected post-add query result: %+v", created) 
+		return nil, util.Fatalf("unexpected post-add query result: %+v", created)
 	}
 	return &created[0], nil
 }
@@ -217,65 +217,64 @@ func (c *CardClient) DeleteAddress(bookname, email string) (*[]carddav.AddressOb
 	uri := util.BookURI(c.username, bookname)
 	addrs, err := c.QueryAddress(bookname, email)
 	if err != nil {
-	    return nil, err
+		return nil, err
 	}
 	for _, addr := range *addrs {
-	    uuid, err := GetAddressUUID(addr)
-	    if err != nil {
-		return nil, err
-	    }
-	    path := uri + uuid + ".vcf"
-	    err = c.dav.RemoveAll(ctx, path)
-	    if err != nil {
-		return nil, err
-	    }
+		uuid, err := GetAddressUUID(addr)
+		if err != nil {
+			return nil, err
+		}
+		path := uri + uuid + ".vcf"
+		err = c.dav.RemoveAll(ctx, path)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return addrs, nil
 }
-
 
 func (c *CardClient) QueryAddress(bookname, email string) (*[]carddav.AddressObject, error) {
 	ctx := context.Background()
 	uri := util.BookURI(c.username, bookname)
 	query := carddav.AddressBookQuery{
-	    PropFilters: []carddav.PropFilter{ 
-		carddav.PropFilter{
-		    Name: "EMAIL",
-		    TextMatches: []carddav.TextMatch{
-			carddav.TextMatch{
-			    Text: email,
-			    },
+		PropFilters: []carddav.PropFilter{
+			carddav.PropFilter{
+				Name: "EMAIL",
+				TextMatches: []carddav.TextMatch{
+					carddav.TextMatch{
+						Text: email,
+					},
+				},
 			},
-		    },
 		},
-	    }
+	}
 	addrs, err := c.dav.QueryAddressBook(ctx, uri, &query)
 	if err != nil {
-	    return nil, err
+		return nil, err
 	}
 	return &addrs, nil
 }
 
-func (c *CardClient)ScanAddress(email string) (*[]carddav.AddressBook, error) {
-    result := []carddav.AddressBook{}
-    books, err := c.List()
-    if err != nil {
-	return nil, err
-    }
-    for _, book := range *books {
-
-	_, bookname, err := util.ParseBookPath(c.username, book.Path)
+func (c *CardClient) ScanAddress(email string) (*[]carddav.AddressBook, error) {
+	result := []carddav.AddressBook{}
+	books, err := c.List()
 	if err != nil {
-	    return nil, err
+		return nil, err
 	}
-	addrs, err := c.QueryAddress(bookname, email)
-	if err != nil {
-	    return nil, err
-	}
-	if len(*addrs) > 0 {
-	    result = append(result, book)
-	}
+	for _, book := range *books {
 
-    }
-    return &result, nil
+		_, bookname, err := util.ParseBookPath(c.username, book.Path)
+		if err != nil {
+			return nil, err
+		}
+		addrs, err := c.QueryAddress(bookname, email)
+		if err != nil {
+			return nil, err
+		}
+		if len(*addrs) > 0 {
+			result = append(result, book)
+		}
+
+	}
+	return &result, nil
 }

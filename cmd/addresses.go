@@ -27,9 +27,9 @@ import (
 )
 
 var addressesCmd = &cobra.Command{
-	Use:   "addresses USERNAME BOOKNAME",
+	Use:     "addresses USERNAME BOOKNAME",
 	Aliases: []string{"ls"},
-	Short: "list email addresses in address book",
+	Short:   "list email addresses in address book",
 	Long: `
 Output email addresses from address book identified by USERNAME and BOOKNAME.
 `,
