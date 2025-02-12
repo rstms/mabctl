@@ -27,21 +27,27 @@ import (
 )
 
 var mkuserCmd = &cobra.Command{
-	Use:   "mkuser EMAIL DISPLAY_NAME PASSWORD",
+	Use:   "mkuser EMAIL [DISPLAY_NAME] [PASSWORD]",
 	Short: "add a user account",
 	Long: `
 Add a user account to the caldav/carddav server.  Usernames are email
 addresses by convention.  The display name will be visible to the user.
 `,
-	Args: cobra.ExactArgs(3),
+	Args: cobra.RangeArgs(1,3),
 	Run: func(cmd *cobra.Command, args []string) {
 		email := args[0]
-		display := args[1]
-		password := args[2]
+		display := ""
+		if len(args) > 1 {
+		    display = args[1]
+		}
+		password := ""
+		if len(args) > 2 {
+		    password = args[2]
+		}
 		response, err := MAB.AddUser(email, display, password)
 		cobra.CheckErr(err)
 		if !HandleResponse(response, response.User) {
-			fmt.Println(response.User.URI)
+		    fmt.Printf("created: %s\n", response.User.UserName)
 		}
 	},
 }

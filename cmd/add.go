@@ -27,18 +27,21 @@ import (
 )
 
 var addCmd = &cobra.Command{
-	Use:   "add USERNAME BOOKNAME EMAIL NAME",
+	Use:   "add USERNAME BOOKNAME EMAIL [NAME]",
 	Short: "add email adddress",
 	Long: `
 Add an email address to the CardDAV address book BOOKNAME under the user
 account USERNAME
 `,
-	Args: cobra.ExactArgs(4),
+	Args: cobra.RangeArgs(3,4),
 	Run: func(cmd *cobra.Command, args []string) {
 		username := args[0]
 		bookname := args[1]
 		email := args[2]
-		name := args[3]
+		name := email
+		if len(args) > 3 {
+		    name = args[3]
+		}
 		response, err := MAB.AddAddress(username, bookname, email, name)
 		cobra.CheckErr(err)
 		if !HandleResponse(response, response.Address) {

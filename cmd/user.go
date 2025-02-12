@@ -26,7 +26,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var userCmd = &cobra.Command{
@@ -43,12 +42,10 @@ Can be used to determine user existence.
 		cobra.CheckErr(err)
 		for _, user := range response.Users {
 			if user.UserName == username {
-				if viper.GetBool("json") {
-					PrintResponse(&user)
-				} else {
-					fmt.Println(user.UserName)
-				}
-				os.Exit(0)
+			    if ! HandleResponse(&user, &user.UserName) {
+				fmt.Println(user.UserName)
+			    }
+			    os.Exit(0)
 			}
 		}
 		os.Exit(1)

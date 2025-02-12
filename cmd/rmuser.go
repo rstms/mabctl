@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+    "fmt"
 	"github.com/spf13/cobra"
 )
 
@@ -36,7 +37,9 @@ Delete the CardDAV account for USERNAME including all address books.
 		username := args[0]
 		response, err := MAB.DeleteUser(username)
 		cobra.CheckErr(err)
-		PrintResponse(response)
+		if ! HandleResponse(response, response.Message) {
+		    fmt.Println(response.Message)
+		}
 	},
 }
 

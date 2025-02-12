@@ -11,6 +11,8 @@ import (
 	"net/url"
 )
 
+const PASSWORD_LENGTH = 12
+
 type ErrorMessage struct {
 	Error string `json:"error"`
 }
@@ -273,6 +275,16 @@ func (c *Controller) GetBooksAdmin(username string) (*AdminBooksResponse, error)
 }
 
 func (c *Controller) AddUser(username, display, password string) (*AddUserResponse, error) {
+	var err error
+	if display == "" {
+	    display = username
+	}
+	if password == "" {
+	    password, err = mkpasswd(PASSWORD_LENGTH)
+	    if err != nil {
+		return nil, util.Fatalf("failed generating password: %v", err)
+	    }
+	}
 	user := map[string]string{
 		"username":    username,
 		"displayname": display,
@@ -295,6 +307,9 @@ func (c *Controller) AddUser(username, display, password string) (*AddUserRespon
 }
 
 func (c *Controller) AddBook(email, name, description string) (*AddBookResponse, error) {
+	if description == "" {
+	    description = name
+	}
 	book := map[string]string{
 		"username":    email,
 		"bookname":    name,

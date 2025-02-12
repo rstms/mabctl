@@ -42,7 +42,7 @@ account USERNAME
 		cobra.CheckErr(err)
 		if !HandleResponse(response, response.Addresses) {
 		    for _, address := range response.Addresses {
-			fmt.Println(address.Path)
+			fmt.Printf("Deleted: %s\n", address.Path)
 		    }
 		}
 	},
