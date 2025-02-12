@@ -94,6 +94,15 @@ func (c *Controller) SetPassword(username, password string) error {
     return writeAccounts(accounts)
 }
 
+func (c *Controller) DeletePassword(username string) error {
+    accounts, err := readAccounts()
+    if err != nil {
+	return err
+    }
+    delete(accounts, username)
+    return writeAccounts(accounts)
+}
+
 func NewAddressBookController() (*Controller, error) {
 	username := viper.GetString("admin_username")
 	password := viper.GetString("admin_password")

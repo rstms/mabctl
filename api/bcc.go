@@ -358,6 +358,10 @@ func (c *Controller) DeleteBook(username, bookname string) (*Response, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = c.DeletePassword(username)
+	if err != nil {
+		return nil, err
+	}
 	return &ret, nil
 }
 
