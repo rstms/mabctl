@@ -36,10 +36,9 @@ Query the admin server status and write to stdout as JSON
 	Run: func(cmd *cobra.Command, args []string) {
 		response, err := MAB.GetStatus()
 		cobra.CheckErr(err)
-		if viper.GetBool("verbose") {
-			PrintResponse(response)
-		} else {
-			PrintResponse(response.Status)
+		if ! HandleResponse(response, response.Status) {
+		    viper.Set("json", true)
+		    PrintResponse(response.Status)
 		}
 	},
 }

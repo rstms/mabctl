@@ -374,7 +374,6 @@ func (c *Controller) GetBooks(username string) (*BooksResponse, error) {
 }
 
 func (c *Controller) convertBook(davBook *carddav.AddressBook) (*Book, error) {
-	fmt.Printf("convertBook: %+v\n", *davBook)
 	username, bookname, token, err := util.ParseBookPath(davBook.Path)
 	if err != nil {
 		return nil, err
