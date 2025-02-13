@@ -40,18 +40,19 @@ func BookToken(username, bookname string) string {
 	return token
 }
 
-// return username, bookname from book path
-func ParseBookPath(username, path string) (string, string, error) {
+// return username, bookname, token from book path
+func ParseBookPath(path string) (string, string, string, error) {
 	fields := strings.SplitN(path, "/", -1)
-	if len(fields) < 3 {
-		return "", "", Fatalf("unexpected book path: %s", path)
+	if len(fields) < 4 {
+		return "", "", "", Fatalf("unexpected book path: %s", path)
 	}
+	username := fields[len(fields)-3]
 	token := fields[len(fields)-2]
 	username, bookname, err := ParseBookToken(username, token)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
-	return username, bookname, nil
+	return username, bookname, token, nil
 }
 
 // return book URI given username, bookname

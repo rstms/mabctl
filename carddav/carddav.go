@@ -263,7 +263,7 @@ func (c *CardClient) ScanAddress(email string) (*[]carddav.AddressBook, error) {
 	}
 	for _, book := range *books {
 
-		_, bookname, err := util.ParseBookPath(c.username, book.Path)
+		_, bookname, _, err := util.ParseBookPath(book.Path)
 		if err != nil {
 			return nil, err
 		}

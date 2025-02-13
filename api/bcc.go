@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"github.com/emersion/go-webdav/carddav"
 	"github.com/rstms/mabctl/util"
+	"github.com/spf13/viper"
 	"io/ioutil"
 	"net/http"
-	"net/url"
+	"strings"
 )
 
 const PASSWORD_LENGTH = 12
@@ -56,26 +57,9 @@ type AddUserResponse struct {
 	User User `json:"user"`
 }
 
-type AdminBooksResponse struct {
-	Response
-	Books []Book `json:"books"`
-}
-
 type BooksResponse struct {
 	Response
-	Books []carddav.AddressBook `json:"books"`
-}
-
-func (b *BooksResponse) Names() ([]string, error) {
-	ret := make([]string, len(b.Books))
-	for i, book := range b.Books {
-		_, name, err := util.ParseBookPath("", book.Path)
-		if err != nil {
-			return []string{}, err
-		}
-		ret[i] = name
-	}
-	return ret, nil
+	Books []Book `json:"books"`
 }
 
 type AddBookResponse struct {
@@ -101,6 +85,12 @@ type AddressesResponse struct {
 type AddressResponse struct {
 	Response
 	Address carddav.AddressObject `json:"address"`
+}
+
+type AccountResponse struct {
+    Response
+    Username string
+    Password string
 }
 
 func Format(data interface{}) (string, error) {
@@ -258,20 +248,6 @@ func (c *Controller) GetUsers() (*UsersResponse, error) {
 	return &ret, nil
 }
 
-func (c *Controller) GetBooksAdmin(username string) (*AdminBooksResponse, error) {
-	var ret AdminBooksResponse
-	var err error
-	if username == "" {
-		err = c.get("/books/", &ret)
-	} else {
-		err = c.get(fmt.Sprintf("/books/%s/", url.PathEscape(username)), &ret)
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &ret, nil
-}
-
 func (c *Controller) AddUser(username, display, password string) (*AddUserResponse, error) {
 	var err error
 	if display == "" {
@@ -294,10 +270,6 @@ func (c *Controller) AddUser(username, display, password string) (*AddUserRespon
 	}
 	var ret AddUserResponse
 	err = c.post("/user/", &jsonData, &ret)
-	if err != nil {
-		return nil, err
-	}
-	err = c.SetPassword(username, password)
 	if err != nil {
 		return nil, err
 	}
@@ -335,10 +307,6 @@ func (c *Controller) DeleteUser(username string) (*Response, error) {
 	}
 	var ret Response
 	err = c.del("/user/", &jsonData, &ret)
-	if err != nil {
-		return nil, err
-	}
-	err = c.DeletePassword(username)
 	if err != nil {
 		return nil, err
 	}
@@ -393,9 +361,44 @@ func (c *Controller) GetBooks(username string) (*BooksResponse, error) {
 	response := BooksResponse{}
 	response.Success = true
 	response.Request = "CardDAV address books query"
-	response.Message = fmt.Sprintf("%s books", username)
-	response.Books = *books
+	response.Message = fmt.Sprintf("user %s books", username)
+	response.Books = make([]Book, len(*books))
+	for i, book := range *books {
+		book, err := c.convertBook(&book)
+		if err != nil {
+			return nil, err
+		}
+		response.Books[i] = *book
+	}
 	return &response, nil
+}
+
+func (c *Controller) convertBook(davBook *carddav.AddressBook) (*Book, error) {
+	fmt.Printf("convertBook: %+v\n", *davBook)
+	username, bookname, token, err := util.ParseBookPath(davBook.Path)
+	if err != nil {
+		return nil, err
+	}
+	uriIndex := strings.Index(davBook.Path, "/addressbooks/")
+	if uriIndex == -1 {
+		return nil, util.Fatalf("convertBook uri parse failed: %s", davBook.Path)
+	}
+	uri := fmt.Sprintf("%s%s", viper.GetString("dav_url"), davBook.Path[uriIndex:])
+
+	addressesResponse, err := c.Addresses(username, bookname)
+	if err != nil {
+		return nil, util.Fatalf("convertBook Addresses query failed: %v", err)
+	}
+	contacts := len(addressesResponse.Addresses)
+	book := Book{
+		UserName:    username,
+		BookName:    bookname,
+		Description: davBook.Description,
+		Contacts:    contacts,
+		Token:       token,
+		URI:         uri,
+	}
+	return &book, nil
 
 }
 
@@ -476,6 +479,22 @@ func (c *Controller) ScanAddress(username, email string) (*BooksResponse, error)
 	} else {
 		response.Message = fmt.Sprintf("found: %d", len(*books))
 	}
-	response.Books = *books
+	response.Books = make([]Book, len(*books))
+	for i, davBook := range *books {
+		book, err := c.convertBook(&davBook)
+		if err != nil {
+			return nil, err
+		}
+		response.Books[i] = *book
+	}
 	return &response, nil
+}
+
+func (c *Controller) GetPassword(username string) (string, error) {
+    response := AccountResponse{}
+	err := c.get("/password/" + username + "/", &response)
+	if err != nil {
+		return "", err
+	}
+	return response.Password, nil
 }

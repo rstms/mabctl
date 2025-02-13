@@ -48,10 +48,8 @@ code 0 if at least one book contains the address.
 		}
 		if !HandleResponse(response, response.Books) {
 			if !viper.GetBool("quiet") {
-				names, err := response.Names()
-				cobra.CheckErr(err)
-				for _, name := range names {
-					fmt.Println(name)
+				for _, book := range response.Books {
+					fmt.Println(book.BookName)
 				}
 			}
 		}

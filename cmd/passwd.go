@@ -27,19 +27,14 @@ import (
 )
 
 var passwdCmd = &cobra.Command{
-	Use:   "passwd USERNAME [PASSWORD]",
-	Short: "set or get password",
+	Use:   "passwd USERNAME",
+	Short: "get password",
 	Long: `
-If PASSWORD is provided, reset the stored password for USERNAME, then output
-the address book password for USERNAME to stdout.
+Write the CardDAV password for USERNAME to stdout
 `,
-	Args: cobra.RangeArgs(1, 2),
+	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		username := args[0]
-		if len(args) > 1 {
-			err := MAB.SetPassword(username, args[1])
-			cobra.CheckErr(err)
-		}
 		password, err := MAB.GetPassword(username)
 		cobra.CheckErr(err)
 		fmt.Println(password)

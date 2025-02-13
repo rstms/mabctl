@@ -73,35 +73,6 @@ func writeAccounts(accounts map[string]string) error {
 	return os.WriteFile(passwd, []byte(content), 0660)
 }
 
-func (c *Controller) GetPassword(username string) (string, error) {
-	accounts, err := readAccounts()
-	if err != nil {
-		return "", err
-	}
-	password, ok := accounts[username]
-	if ok {
-		return password, nil
-	}
-	return "", fmt.Errorf("password not found for username: %s", username)
-}
-
-func (c *Controller) SetPassword(username, password string) error {
-	accounts, err := readAccounts()
-	if err != nil {
-		return err
-	}
-	accounts[username] = password
-	return writeAccounts(accounts)
-}
-
-func (c *Controller) DeletePassword(username string) error {
-	accounts, err := readAccounts()
-	if err != nil {
-		return err
-	}
-	delete(accounts, username)
-	return writeAccounts(accounts)
-}
 
 func LookupDomain() (string, error) {
 	domain := viper.GetString("domain")
@@ -156,7 +127,7 @@ func SetDefaults() error {
 func NewAddressBookController() (*Controller, error) {
 	err := SetDefaults()
 	if err != nil {
-	    return nil, util.Fatalf("failed setting config defaults: %v", err)
+		return nil, util.Fatalf("failed setting config defaults: %v", err)
 	}
 
 	clientCert, err := tls.LoadX509KeyPair(viper.GetString("cert"), viper.GetString("key"))

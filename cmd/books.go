@@ -24,7 +24,6 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var booksCmd = &cobra.Command{
@@ -36,23 +35,11 @@ List address boooks for a user account.
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		username := args[0]
-		if viper.GetBool("admin") {
-			response, err := MAB.GetBooksAdmin(username)
-			cobra.CheckErr(err)
-			if !HandleResponse(response, response.Books) {
-				for _, book := range response.Books {
-					fmt.Println(book.Token)
-				}
-			}
-		} else {
-			response, err := MAB.GetBooks(username)
-			cobra.CheckErr(err)
-			if !HandleResponse(response, response.Books) {
-				names, err := response.Names()
-				cobra.CheckErr(err)
-				for _, name := range names {
-					fmt.Println(name)
-				}
+		response, err := MAB.GetBooks(username)
+		cobra.CheckErr(err)
+		if !HandleResponse(response, response.Books) {
+			for _, book := range response.Books {
+				fmt.Println(book.BookName)
 			}
 		}
 	},
