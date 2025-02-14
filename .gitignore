@@ -27,3 +27,4 @@ notes
 mabctl
 .release
 *.core
+*.json

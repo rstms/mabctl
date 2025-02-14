@@ -73,7 +73,6 @@ func writeAccounts(accounts map[string]string) error {
 	return os.WriteFile(passwd, []byte(content), 0660)
 }
 
-
 func LookupDomain() (string, error) {
 	domain := viper.GetString("domain")
 	if domain == "" {

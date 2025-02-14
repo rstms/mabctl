@@ -88,9 +88,32 @@ type AddressResponse struct {
 }
 
 type AccountResponse struct {
-    Response
-    Username string
-    Password string
+	Response
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type UserAccountsResponse struct {
+	Response
+	Accounts map[string]string `json:"accounts"`
+}
+
+type UserAccountsRequest struct {
+	Accounts map[string]string `json:"accounts"`
+}
+
+type UserDump struct {
+	Password string
+	Books    map[string][]string
+}
+
+type ConfigDump struct {
+	Users map[string]UserDump
+}
+
+type DumpResponse struct {
+	Response
+	Dump ConfigDump
 }
 
 func Format(data interface{}) (string, error) {
@@ -276,13 +299,13 @@ func (c *Controller) AddUser(username, display, password string) (*AddUserRespon
 	return &ret, nil
 }
 
-func (c *Controller) AddBook(email, name, description string) (*AddBookResponse, error) {
+func (c *Controller) AddBook(username, bookname, description string) (*AddBookResponse, error) {
 	if description == "" {
-		description = name
+		description = bookname
 	}
 	book := map[string]string{
-		"username":    email,
-		"bookname":    name,
+		"username":    username,
+		"bookname":    bookname,
 		"description": description,
 	}
 	jsonData, err := json.Marshal(book)
@@ -490,10 +513,98 @@ func (c *Controller) ScanAddress(username, email string) (*BooksResponse, error)
 }
 
 func (c *Controller) GetPassword(username string) (string, error) {
-    response := AccountResponse{}
-	err := c.get("/password/" + username + "/", &response)
+	response := AccountResponse{}
+	err := c.get("/password/"+username+"/", &response)
 	if err != nil {
 		return "", err
 	}
 	return response.Password, nil
+}
+
+func (c *Controller) GetAccounts() (*UserAccountsResponse, error) {
+	response := UserAccountsResponse{}
+	err := c.get("/accounts/", &response)
+	if err != nil {
+		return nil, err
+	}
+	return &response, nil
+}
+
+func (c *Controller) SetAccounts(request *UserAccountsRequest) (*UserAccountsResponse, error) {
+	response := UserAccountsResponse{}
+	jsonData, err := json.Marshal(request)
+	if err != nil {
+		return nil, util.Fatalf("failed formatting set passwords request data: %v", err)
+	}
+	err = c.post("/accounts/", &jsonData, &response)
+	if err != nil {
+		return nil, err
+	}
+	return &response, nil
+}
+
+func (c *Controller) Dump() (*DumpResponse, error) {
+	dump := ConfigDump{Users: make(map[string]UserDump)}
+	accountsResponse, err := c.GetAccounts()
+	if err != nil {
+		return nil, err
+	}
+	for username, password := range accountsResponse.Accounts {
+		dump.Users[username] = UserDump{Password: password, Books: make(map[string][]string)}
+		booksResponse, err := c.GetBooks(username)
+		if err != nil {
+			return nil, err
+		}
+		for _, book := range booksResponse.Books {
+			addressesResponse, err := c.Addresses(username, book.BookName)
+			if err != nil {
+				return nil, err
+			}
+			dump.Users[username].Books[book.BookName] = make([]string, len(addressesResponse.Addresses))
+			for i, addr := range addressesResponse.Addresses {
+				email := addr.Card.Get("EMAIL")
+				if email == nil {
+					return nil, util.Fatalf("null EMAIL value: username=%s bookname=%s %v", username, book.BookName, i)
+				}
+				dump.Users[username].Books[book.BookName][i] = email.Value
+			}
+		}
+	}
+	return &DumpResponse{Dump: dump}, nil
+}
+
+func (c *Controller) Restore(dump *ConfigDump) (*Response, error) {
+	for username, user := range dump.Users {
+		_, err := c.AddUser(username, username, user.Password)
+		if err != nil {
+			return nil, util.Fatalf("failed restoring username=%s: %v", username, err)
+		}
+		for bookname, addresses := range user.Books {
+			_, err := c.AddBook(username, bookname, "")
+			if err != nil {
+				return nil, util.Fatalf("failed restoring username=%s bookname=%s: %v", username, bookname, err)
+			}
+			for _, address := range addresses {
+				_, err := c.AddAddress(username, bookname, address, "")
+				if err != nil {
+					return nil, util.Fatalf("failed restoring username=%s bookname=%s address=%s: %v", username, bookname, address, err)
+				}
+			}
+		}
+	}
+	return &Response{Request: "restore from dump", Success: true, Message: "restored"}, nil
+}
+
+func (c *Controller) Clear() (*Response, error) {
+	userResponse, err := c.GetUsers()
+	if err != nil {
+		return nil, util.Fatalf("failed getting users: %v", err)
+	}
+	for _, user := range userResponse.Users {
+		_, err := c.DeleteUser(user.UserName)
+		if err != nil {
+			return nil, util.Fatalf("failed deleting username=%s : %v", user.UserName, err)
+		}
+	}
+	return &Response{Request: "clear", Success: true, Message: "cleared"}, nil
 }

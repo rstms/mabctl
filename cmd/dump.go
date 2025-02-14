@@ -26,33 +26,24 @@ import (
 	"github.com/spf13/viper"
 )
 
-// statusCmd represents the status command
-var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "admin server status",
+var dumpCmd = &cobra.Command{
+	Use:   "dump",
+	Short: "dump CardDAV config",
 	Long: `
-Query the admin server status and write to stdout as JSON
+Query admin interface and output a list of all user accounts
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		response, err := MAB.GetStatus()
+
+		response, err := MAB.Dump()
 		cobra.CheckErr(err)
-		if !HandleResponse(response, response.Status) {
+
+		if !HandleResponse(response, response.Dump) {
 			viper.Set("json", true)
-			PrintResponse(response.Status)
+			PrintResponse(response.Dump)
 		}
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(statusCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// statusCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// statusCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.AddCommand(dumpCmd)
 }

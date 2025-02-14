@@ -22,37 +22,46 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"encoding/json"
+	"fmt"
+	"github.com/rstms/mabctl/api"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	"os"
 )
 
-// statusCmd represents the status command
-var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "admin server status",
+var restoreCmd = &cobra.Command{
+	Use:   "restore [FILENAME]",
+	Short: "DESTRUCTIVE restore from dump file",
 	Long: `
-Query the admin server status and write to stdout as JSON
+Restore the CardDAV server config from a JSON dump file.  If FILENAME is 
+provided read from the file.  If FILENAME is absent or '-' read from STDIN
 `,
+	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		response, err := MAB.GetStatus()
+		filename := args[0]
+		var file *os.File
+		var err error
+		if filename == "" || filename == "-" {
+			// read from STDIN
+			file = os.Stdin
+		} else {
+			// read from file
+			file, err = os.Open(filename)
+			cobra.CheckErr(err)
+			defer file.Close()
+		}
+		var dump api.ConfigDump
+		decoder := json.NewDecoder(file)
+		err = decoder.Decode(&dump)
 		cobra.CheckErr(err)
-		if !HandleResponse(response, response.Status) {
-			viper.Set("json", true)
-			PrintResponse(response.Status)
+		response, err := MAB.Restore(&dump)
+		cobra.CheckErr(err)
+		if !HandleResponse(response, response) {
+			fmt.Println(response.Message)
 		}
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(statusCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// statusCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// statusCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.AddCommand(restoreCmd)
 }
