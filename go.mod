@@ -1,6 +1,6 @@
 module github.com/rstms/mabctl
 
-go 1.22.5
+go 1.22.1
 
 require (
 	github.com/emersion/go-vcard v0.0.0-20241024213814-c9703dde27ff
