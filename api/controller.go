@@ -15,6 +15,8 @@ import (
 	"strings"
 )
 
+const Version = "1.3.6"
+
 func mkpasswd(size int) (string, error) {
 	bytes := make([]byte, size)
 	_, err := rand.Read(bytes)
