@@ -3,6 +3,7 @@ package carddav
 import (
 	"context"
 	"fmt"
+	"crypto/tls"
 	"github.com/emersion/go-vcard"
 	"github.com/emersion/go-webdav/carddav"
 	"github.com/google/uuid"
@@ -72,7 +73,7 @@ type CardClient struct {
 	dav      *carddav.Client
 }
 
-func NewClient(username, password, url string) (*CardClient, error) {
+func NewClient(username, password, url, cert, key string, insecure bool) (*CardClient, error) {
 	if url == "" {
 		var err error
 		url, err = discover(username)
@@ -80,7 +81,21 @@ func NewClient(username, password, url string) (*CardClient, error) {
 			return nil, err
 		}
 	}
-	client := DigestAuthorizedClient{&http.Client{}, username, password, nil}
+
+	clientCert, err := tls.LoadX509KeyPair(cert, key)
+	if err != nil {
+		return nil, util.Fatalf("failed loading client certificate: %v", err)
+	}
+	tlsConfig := &tls.Config{Certificates: []tls.Certificate{clientCert},
+		InsecureSkipVerify: insecure,
+	}
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+	}
+
+	client := DigestAuthorizedClient{httpClient, username, password, nil}
 	dav, err := carddav.NewClient(&client, url)
 	if err != nil {
 		return nil, util.Fatalf("failed creating webdav client: %v", err)

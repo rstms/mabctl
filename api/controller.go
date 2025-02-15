@@ -159,5 +159,8 @@ func (c *Controller) davClient(username string) (*carddav.CardClient, error) {
 		return nil, err
 	}
 	url := viper.GetString("dav_url")
-	return carddav.NewClient(username, password, url)
+	cert := viper.GetString("cert")
+	key := viper.GetString("key")
+	insecure := viper.GetBool("insecure")
+	return carddav.NewClient(username, password, url, cert, key, insecure)
 }
