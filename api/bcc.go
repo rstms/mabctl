@@ -485,17 +485,21 @@ func (c *Controller) QueryAddress(username, bookname, email string) (*AddressesR
 
 // return books containing address
 func (c *Controller) ScanAddress(username, email string) (*BooksResponse, error) {
+	response := BooksResponse{}
+	response.Success = false
+	response.Request = fmt.Sprintf("Scan books for CardDAV address: %s", email)
+
 	dav, err := c.davClient(username)
 	if err != nil {
-		return nil, err
+		response.Message = fmt.Sprintf("%v", err)	
+		return &response, nil
 	}
+	fmt.Printf("dav: %v\n", dav)
 	books, err := dav.ScanAddress(email)
 	if err != nil {
-		return nil, err
+		response.Message = fmt.Sprintf("%v", err)	
+		return &response, nil
 	}
-	response := BooksResponse{}
-	response.Success = true
-	response.Request = fmt.Sprintf("Scan books for CardDAV address: %s", email)
 	if len(*books) == 0 {
 		response.Message = fmt.Sprintf("not found: %s", email)
 	} else {
@@ -509,16 +513,20 @@ func (c *Controller) ScanAddress(username, email string) (*BooksResponse, error)
 		}
 		response.Books[i] = *book
 	}
+	response.Success=true
 	return &response, nil
 }
 
-func (c *Controller) GetPassword(username string) (string, error) {
+func (c *Controller) GetPassword(username string) (*AccountResponse, error) {
 	response := AccountResponse{}
+	response.Request = fmt.Sprintf("get password: %s", username)
 	err := c.get("/password/"+username+"/", &response)
 	if err != nil {
-		return "", err
+		response.Message = fmt.Sprintf("%v", err)
+		return &response, nil
 	}
-	return response.Password, nil
+	response.Success=true
+	return &response, nil
 }
 
 func (c *Controller) GetAccounts() (*UserAccountsResponse, error) {

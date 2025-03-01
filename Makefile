@@ -16,6 +16,9 @@ fmt:
 clean:
 	go clean
 
+test:
+	go test -v -failfast . ./...
+
 sterile: clean
 	go clean -cache -modcache -testcache -i
 	rm -f go.mod

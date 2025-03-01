@@ -156,13 +156,16 @@ func NewAddressBookController() (*Controller, error) {
 }
 
 func (c *Controller) davClient(username string) (*carddav.CardClient, error) {
-	password, err := c.GetPassword(username)
+	passwordResponse, err := c.GetPassword(username)
 	if err != nil {
-		return nil, err
+	    return nil, err
+	}
+	if !passwordResponse.Success {
+	    return nil, fmt.Errorf("Unknown user: %s", username)
 	}
 	url := viper.GetString("dav_url")
 	cert := viper.GetString("cert")
 	key := viper.GetString("key")
 	insecure := viper.GetBool("insecure")
-	return carddav.NewClient(username, password, url, cert, key, insecure)
+	return carddav.NewClient(username, passwordResponse.Password, url, cert, key, insecure)
 }
