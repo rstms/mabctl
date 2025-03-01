@@ -486,34 +486,31 @@ func (c *Controller) QueryAddress(username, bookname, email string) (*AddressesR
 // return books containing address
 func (c *Controller) ScanAddress(username, email string) (*BooksResponse, error) {
 	response := BooksResponse{}
-	response.Success = false
+	response.Success = true
 	response.Request = fmt.Sprintf("Scan books for CardDAV address: %s", email)
 
 	dav, err := c.davClient(username)
 	if err != nil {
-		response.Message = fmt.Sprintf("%v", err)	
+		response.Message = fmt.Sprintf("%v", err)
 		return &response, nil
 	}
-	fmt.Printf("dav: %v\n", dav)
 	books, err := dav.ScanAddress(email)
 	if err != nil {
-		response.Message = fmt.Sprintf("%v", err)	
+		response.Success = false
+		response.Message = fmt.Sprintf("%v", err)
 		return &response, nil
 	}
-	if len(*books) == 0 {
-		response.Message = fmt.Sprintf("not found: %s", email)
-	} else {
-		response.Message = fmt.Sprintf("found: %d", len(*books))
-	}
+	response.Message = fmt.Sprintf("books found: %d", len(*books))
 	response.Books = make([]Book, len(*books))
 	for i, davBook := range *books {
 		book, err := c.convertBook(&davBook)
 		if err != nil {
-			return nil, err
+		    response.Success=false
+		    response.Message = fmt.Sprintf("%v", err)
+		    return &response, nil
 		}
 		response.Books[i] = *book
 	}
-	response.Success=true
 	return &response, nil
 }
 
@@ -525,7 +522,7 @@ func (c *Controller) GetPassword(username string) (*AccountResponse, error) {
 		response.Message = fmt.Sprintf("%v", err)
 		return &response, nil
 	}
-	response.Success=true
+	response.Success = true
 	return &response, nil
 }
 

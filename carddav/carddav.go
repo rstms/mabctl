@@ -2,8 +2,8 @@ package carddav
 
 import (
 	"context"
-	"fmt"
 	"crypto/tls"
+	"fmt"
 	"github.com/emersion/go-vcard"
 	"github.com/emersion/go-webdav/carddav"
 	"github.com/google/uuid"
