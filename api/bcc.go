@@ -69,7 +69,7 @@ type AddBookResponse struct {
 
 type StatusResponse struct {
 	Response
-	Status map[string]string `json:"status"`
+	Status map[string]any`json:"status"`
 }
 
 type ErrorResponse struct {

@@ -28,3 +28,4 @@ mabctl
 .release
 *.core
 *.json
+headers
