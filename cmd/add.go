@@ -42,7 +42,7 @@ account USERNAME
 		if len(args) > 3 {
 			name = args[3]
 		}
-		response, err := MAB.AddAddress(username, bookname, email, name)
+		response, err := MAB.AddAddress(nil, username, bookname, email, name)
 		cobra.CheckErr(err)
 		if !HandleResponse(response, response.Address) {
 			fmt.Println(response.Address.Path)

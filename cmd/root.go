@@ -79,16 +79,16 @@ func init() {
 
 	optionSwitch("insecure", "", "disable server certificate validation")
 	optionSwitch("json", "j", "select JSON output")
-	optionSwitch("admin", "", "use BCC admin API")
 	optionSwitch("verbose", "v", "enable diagnostic output")
 	optionSwitch("quiet", "q", "suppress output")
-	optionString("dav-url", "", "", "baikal carddav URL")
+	optionString("domain", "d", "", "CardDAV server domain")
 	optionString("admin-username", "U", "admin", "baikal admin username")
 	optionString("admin-password", "P", "", "baikal admin password")
-	optionString("admin-url", "", "", "bcc API URL")
-	optionString("api-key", "a", "", "bcc API key")
-	optionString("cert", "c", "/etc/mabctl/mabctl.pem", "client certificate file")
-	optionString("key", "k", "/etc/mabctl/mabctl.key", "client certificate key file")
+	optionString("bcc-url", "", "", "bcc API URL")
+	optionString("dav-url", "", "", "baikal carddav URL")
+	optionString("api-key", "", "", "bcc API key")
+	optionString("client-cert", "", "/etc/mabctl/mabctl.pem", "client certificate file")
+	optionString("client-key", "", "/etc/mabctl/mabctl.key", "client certificate key file")
 
 }
 

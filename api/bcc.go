@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/emersion/go-webdav/carddav"
+	davapi "github.com/rstms/mabctl/carddav"
 	"github.com/rstms/mabctl/util"
 	"github.com/spf13/viper"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -52,6 +55,11 @@ type UsersResponse struct {
 	Users []User `json:"users"`
 }
 
+type UserBooksResponse struct {
+	Response
+	UserBooks map[string][]string
+}
+
 type AddUserResponse struct {
 	Response
 	User User `json:"user"`
@@ -69,7 +77,7 @@ type AddBookResponse struct {
 
 type StatusResponse struct {
 	Response
-	Status map[string]any`json:"status"`
+	Status map[string]any `json:"status"`
 }
 
 type ErrorResponse struct {
@@ -138,6 +146,14 @@ func FormatIfJSON(body []byte) string {
 		return string(body)
 	}
 	return string(formatted)
+}
+
+func URIPath(uri string) (string, error) {
+	parsed, err := url.Parse(uri)
+	if err != nil {
+		return "", util.Fatalf("failed parsing URI %s: %v", uri, err)
+	}
+	return parsed.Path, nil
 }
 
 func (c *Controller) request(method, path string, data *[]byte) (*http.Request, error) {
@@ -271,6 +287,30 @@ func (c *Controller) GetUsers() (*UsersResponse, error) {
 	return &ret, nil
 }
 
+func (c *Controller) GetUserBooks() (*UserBooksResponse, error) {
+	var ret UserBooksResponse
+	ret.Success = true
+	ret.Message = "all users and address books"
+	ret.Request = "get user books"
+	usersResponse, err := c.GetUsers()
+	if err != nil {
+		return nil, err
+	}
+	ret.UserBooks = make(map[string][]string)
+	for _, user := range usersResponse.Users {
+		booksResponse, err := c.GetBooks(user.UserName)
+		if err != nil {
+			return nil, err
+		}
+		books := []string{}
+		for _, book := range booksResponse.Books {
+			books = append(books, book.BookName)
+		}
+		ret.UserBooks[user.UserName] = books
+	}
+	return &ret, nil
+}
+
 func (c *Controller) AddUser(username, display, password string) (*AddUserResponse, error) {
 	var err error
 	if display == "" {
@@ -296,6 +336,10 @@ func (c *Controller) AddUser(username, display, password string) (*AddUserRespon
 	if err != nil {
 		return nil, err
 	}
+	_, err = c.DeleteBook(username, "default address book")
+	if err != nil {
+		return nil, err
+	}
 	return &ret, nil
 }
 
@@ -307,6 +351,20 @@ func (c *Controller) AddBook(username, bookname, description string) (*AddBookRe
 		"username":    username,
 		"bookname":    bookname,
 		"description": description,
+	}
+	booksResponse, err := c.GetBooks(username)
+	if err != nil {
+	    return nil, util.Fatalf("requesting existing books: %v", err)
+	}
+	for _, book := range booksResponse.Books {
+	    if book.BookName == bookname {
+		var response AddBookResponse
+		response.Success = true
+		response.Request = "add book"
+		response.Message = "book Exists"
+		response.Book = book
+		return &response, nil
+	    }
 	}
 	jsonData, err := json.Marshal(book)
 	if err != nil {
@@ -354,13 +412,24 @@ func (c *Controller) DeleteBook(username, bookname string) (*Response, error) {
 	return &ret, nil
 }
 
-func (c *Controller) Addresses(username, bookname string) (*AddressesResponse, error) {
-	dav, err := c.davClient(username)
+func (c *Controller) Addresses(dav *davapi.CardClient, username, bookname string) (*AddressesResponse, error) {
+
+	if dav == nil {
+		var err error
+		dav, err = c.davClient(username)
+		if err != nil {
+			return nil, err
+		}
+	}
+	book, err := c.GetBook(username, bookname)
 	if err != nil {
 		return nil, err
 	}
-
-	addrs, err := dav.Addresses(bookname)
+	path, err := URIPath(book.URI)
+	if err != nil {
+		return nil, err
+	}
+	addrs, err := dav.Addresses(path)
 	if err != nil {
 		return nil, err
 	}
@@ -372,73 +441,88 @@ func (c *Controller) Addresses(username, bookname string) (*AddressesResponse, e
 	return &response, nil
 }
 
-func (c *Controller) GetBooks(username string) (*BooksResponse, error) {
-	dav, err := c.davClient(username)
+func (c *Controller) GetBook(username, bookname string) (*Book, error) {
+	response, err := c.GetBooks(username)
 	if err != nil {
 		return nil, err
 	}
-	books, err := dav.List()
-	if err != nil {
-		return nil, err
-	}
-	response := BooksResponse{}
-	response.Success = true
-	response.Request = "CardDAV address books query"
-	response.Message = fmt.Sprintf("user %s books", username)
-	response.Books = make([]Book, len(*books))
-	for i, book := range *books {
-		book, err := c.convertBook(&book)
-		if err != nil {
-			return nil, err
+	for _, book := range response.Books {
+		if book.BookName == bookname {
+			return &book, nil
 		}
-		response.Books[i] = *book
+	}
+	return nil, util.Fatalf("book name not found: %s", bookname)
+}
+
+func (c *Controller) GetBooks(username string) (*BooksResponse, error) {
+	response := BooksResponse{}
+	err := c.get(fmt.Sprintf("/books/%s/", username), &response)
+	if err != nil {
+		return nil, err
 	}
 	return &response, nil
 }
 
-func (c *Controller) convertBook(davBook *carddav.AddressBook) (*Book, error) {
+func (c *Controller) convertBook(dav *davapi.CardClient, davBook *carddav.AddressBook, detailed bool) (*Book, error) {
 	username, bookname, token, err := util.ParseBookPath(davBook.Path)
 	if err != nil {
 		return nil, err
 	}
-	uriIndex := strings.Index(davBook.Path, "/addressbooks/")
-	if uriIndex == -1 {
-		return nil, util.Fatalf("convertBook uri parse failed: %s", davBook.Path)
-	}
-	uri := fmt.Sprintf("%s%s", viper.GetString("dav_url"), davBook.Path[uriIndex:])
-
-	addressesResponse, err := c.Addresses(username, bookname)
-	if err != nil {
-		return nil, util.Fatalf("convertBook Addresses query failed: %v", err)
-	}
-	contacts := len(addressesResponse.Addresses)
 	book := Book{
 		UserName:    username,
 		BookName:    bookname,
 		Description: davBook.Description,
-		Contacts:    contacts,
 		Token:       token,
-		URI:         uri,
+	}
+	if detailed {
+		uriIndex := strings.Index(davBook.Path, "/addressbooks/")
+		if uriIndex == -1 {
+			return nil, util.Fatalf("convertBook uri parse failed: %s", davBook.Path)
+		}
+		book.URI = fmt.Sprintf("%s%s", viper.GetString("dav_url"), davBook.Path[uriIndex:])
+
+		addressesResponse, err := c.Addresses(dav, username, bookname)
+		if err != nil {
+			return nil, util.Fatalf("convertBook Addresses query failed: %v", err)
+		}
+		book.Contacts = len(addressesResponse.Addresses)
 	}
 	return &book, nil
 
 }
 
-func (c *Controller) AddAddress(username, bookname, email, name string) (*AddressResponse, error) {
-	dav, err := c.davClient(username)
-	if err != nil {
-		return nil, err
-	}
-	added, err := dav.AddAddress(bookname, email, name)
-	if err != nil {
-		return nil, err
+func (c *Controller) AddAddress(dav *davapi.CardClient, username, bookname, email, name string) (*AddressResponse, error) {
+	verbose := viper.GetBool("verbose")
+	var err error
+	if dav == nil {
+		dav, err = c.davClient(username)
+		if err != nil {
+			return nil, err
+		}
 	}
 	response := AddressResponse{}
 	response.Success = true
 	response.Request = fmt.Sprintf("Add CardDAV address: %s", email)
-	response.Message = fmt.Sprintf("added %s", email)
-	response.Address = *added
-	return &response, nil
+	found, err := dav.QueryAddress(bookname, email)
+	if err != nil {
+		return nil, err
+	}
+	for _, addr := range *found {
+	    if verbose {
+		log.Printf("AddAddress: found existing: %+v\n", addr)
+	    }
+	    response.Address = addr
+	    response.Message = fmt.Sprintf("existing %s", email)
+	    return &response, nil
+	}
+
+	    added, err := dav.AddAddress(bookname, email, name)
+	    if err != nil {
+		return nil, err
+	    }
+	    response.Address = *added
+	    response.Message = fmt.Sprintf("added %s", email)
+	    return &response, nil
 
 }
 
@@ -462,6 +546,7 @@ func (c *Controller) DeleteAddress(username, bookname, email string) (*Addresses
 	response.Addresses = *deleted
 	return &response, nil
 }
+
 func (c *Controller) QueryAddress(username, bookname, email string) (*AddressesResponse, error) {
 	dav, err := c.davClient(username)
 	if err != nil {
@@ -503,11 +588,11 @@ func (c *Controller) ScanAddress(username, email string) (*BooksResponse, error)
 	response.Message = fmt.Sprintf("books found: %d", len(*books))
 	response.Books = make([]Book, len(*books))
 	for i, davBook := range *books {
-		book, err := c.convertBook(&davBook)
+		book, err := c.convertBook(dav, &davBook, false)
 		if err != nil {
-		    response.Success=false
-		    response.Message = fmt.Sprintf("%v", err)
-		    return &response, nil
+			response.Success = false
+			response.Message = fmt.Sprintf("%v", err)
+			return &response, nil
 		}
 		response.Books[i] = *book
 	}
@@ -549,66 +634,240 @@ func (c *Controller) SetAccounts(request *UserAccountsRequest) (*UserAccountsRes
 }
 
 func (c *Controller) Dump() (*DumpResponse, error) {
+	verbose := viper.GetBool("verbose")
 	dump := ConfigDump{Users: make(map[string]UserDump)}
-	accountsResponse, err := c.GetAccounts()
+	usersResponse, err := c.GetUsers()
 	if err != nil {
 		return nil, err
 	}
-	for username, password := range accountsResponse.Accounts {
-		dump.Users[username] = UserDump{Password: password, Books: make(map[string][]string)}
-		booksResponse, err := c.GetBooks(username)
-		if err != nil {
-			return nil, err
-		}
-		for _, book := range booksResponse.Books {
-			addressesResponse, err := c.Addresses(username, book.BookName)
+	type DumpResult struct {
+		username string
+		err      error
+		ret      UserDump
+	}
+	results := make(chan DumpResult)
+	accountsResponse, err := c.GetAccounts()
+	if err != nil {
+	    return nil, err
+	}
+	for _, user := range usersResponse.Users {
+		go func(username string, accounts map[string]string) {
+			if verbose {
+				log.Printf("dumping user %s\n", username)
+			}
+			var dav *davapi.CardClient
+			password, ok := accounts[username]
+			if !ok {
+			    results <- DumpResult{username, fmt.Errorf("password not found: username=%s", username), UserDump{}}
+				return
+			}
+			userdump := UserDump{Password: password, Books: make(map[string][]string)}
+			booksResponse, err := c.GetBooks(username)
 			if err != nil {
-				return nil, err
+				results <- DumpResult{username, err, UserDump{}}
+				return
 			}
-			dump.Users[username].Books[book.BookName] = make([]string, len(addressesResponse.Addresses))
-			for i, addr := range addressesResponse.Addresses {
-				email := addr.Card.Get("EMAIL")
-				if email == nil {
-					return nil, util.Fatalf("null EMAIL value: username=%s bookname=%s %v", username, book.BookName, i)
+			for _, book := range booksResponse.Books {
+				if verbose {
+					log.Printf("dumping book %s/%s\n", username, book.BookName)
 				}
-				dump.Users[username].Books[book.BookName][i] = email.Value
+
+				if book.Contacts == 0 {
+					userdump.Books[book.BookName] = []string{}
+				} else {
+
+					if dav == nil {
+						d, err := c.davClient(username)
+						if err != nil {
+							results <- DumpResult{username, err, UserDump{}}
+							return
+						}
+						dav = d
+						if verbose {
+							log.Printf("created davClient: %+v\n", dav)
+						}
+					}
+
+					addressesResponse, err := c.Addresses(dav, username, book.BookName)
+					if err != nil {
+						results <- DumpResult{username, err, UserDump{}}
+						return
+					}
+					userdump.Books[book.BookName] = make([]string, len(addressesResponse.Addresses))
+					for i, addr := range addressesResponse.Addresses {
+						email := addr.Card.Get("EMAIL")
+						if email == nil {
+							results <- DumpResult{username, util.Fatalf("null EMAIL value: username=%s bookname=%s %v", username, book.BookName, i), UserDump{}}
+							return
+						}
+						userdump.Books[book.BookName][i] = email.Value
+						if verbose {
+							log.Printf("dumping address %s/%s/%s\n", username, book.BookName, email.Value)
+						}
+					}
+				}
 			}
+			results <- DumpResult{username, nil, userdump}
+		}(user.UserName, accountsResponse.Accounts)
+
+	}
+
+	for i := 0; i < len(usersResponse.Users); i++ {
+		result := <-results
+		if result.err != nil {
+			err = result.err
+		} else {
+			dump.Users[result.username] = result.ret
 		}
 	}
-	return &DumpResponse{Dump: dump}, nil
+	if err != nil {
+		return nil, err
+	}
+	var ret DumpResponse
+	ret.Success = true
+	ret.Request = "dump"
+	ret.Message = "dumped"
+	ret.Dump = dump
+	return &ret, nil
 }
 
 func (c *Controller) Restore(dump *ConfigDump) (*Response, error) {
+	verbose := viper.GetBool("verbose")
+	type RestoreResult struct {
+		username string
+		err      error
+	}
+	results := make(chan RestoreResult)
+	type BookAddrs struct {
+		bookname  string
+		addresses []string
+	}
+
+	userbooks := make(map[string][]BookAddrs)
+
 	for username, user := range dump.Users {
 		_, err := c.AddUser(username, username, user.Password)
 		if err != nil {
 			return nil, util.Fatalf("failed restoring username=%s: %v", username, err)
 		}
+		if verbose {
+			log.Printf("created user: %s\n", username)
+		}
+
+		userjobs := []BookAddrs{}
 		for bookname, addresses := range user.Books {
-			_, err := c.AddBook(username, bookname, "")
-			if err != nil {
-				return nil, util.Fatalf("failed restoring username=%s bookname=%s: %v", username, bookname, err)
-			}
-			for _, address := range addresses {
-				_, err := c.AddAddress(username, bookname, address, "")
+			if strings.ToLower(bookname) != "default address book" {
+				_, err := c.AddBook(username, bookname, "")
 				if err != nil {
-					return nil, util.Fatalf("failed restoring username=%s bookname=%s address=%s: %v", username, bookname, address, err)
+					return nil, util.Fatalf("failed restoring username=%s bookname=%s: %v", username, bookname, err)
+				}
+				if verbose {
+					log.Printf("created book: %s/%s [%d]\n", username, bookname, len(addresses))
+				}
+				if len(addresses) > 0 {
+					userjobs = append(userjobs, BookAddrs{bookname, addresses})
 				}
 			}
 		}
+		userbooks[username] = userjobs
 	}
-	return &Response{Request: "restore from dump", Success: true, Message: "restored"}, nil
+
+	for username, jobs := range userbooks {
+		go func(username string, jobs []BookAddrs, results chan RestoreResult) {
+			verbose := viper.GetBool("verbose")
+			if verbose {
+				log.Printf("restore[%s]: begin\n", username)
+			}
+			var dav *davapi.CardClient
+			for _, job := range jobs {
+				if verbose {
+					log.Printf("restore[%s]: job=%+v\n", username, job)
+				}
+				for _, address := range job.addresses {
+
+					if dav == nil {
+						d, err := c.davClient(username)
+						if err != nil {
+							results <- RestoreResult{username, err}
+							return
+						}
+						dav = d
+						if verbose {
+							log.Printf("restore[%s]: created dav client: %v\n", username, dav)
+						}
+					}
+
+					_, err := c.AddAddress(dav, username, job.bookname, address, "")
+					if err != nil {
+						results <- RestoreResult{username, util.Fatalf("failed restoring username=%s bookname=%s address=%s: %v", username, job.bookname, address, err)}
+					}
+					if verbose {
+						log.Printf("restore[%s]: created address: %s/%s/%s\n", username, username, job.bookname, address)
+					}
+				}
+			}
+			if verbose {
+				log.Printf("restore[%s]: success\n", username)
+			}
+			results <- RestoreResult{username, nil}
+		}(username, jobs, results)
+	}
+
+	errors := []string{}
+
+	for i := 0; i < len(dump.Users); i++ {
+		result := <-results
+		if result.err != nil {
+			errors = append(errors, fmt.Sprintf("restore[%s] fail: %v", result.username, result.err))
+		}
+	}
+	if len(errors) > 0 {
+		return nil, fmt.Errorf("%s", strings.Join(errors, "\n"))
+	}
+	return &Response{Request: "restore", Success: true, Message: "restored"}, nil
 }
 
 func (c *Controller) Clear() (*Response, error) {
-	userResponse, err := c.GetUsers()
+	users := make(map[string]bool)
+	accounts := make(map[string]bool)
+	names := make(map[string]bool)
+
+	accountsResponse, err := c.GetAccounts()
+	if err != nil {
+		return nil, util.Fatalf("failed getting accounts: %v", err)
+	}
+	for username, _ := range accountsResponse.Accounts {
+		accounts[username] = true
+		names[username] = true
+	}
+
+	usersResponse, err := c.GetUsers()
 	if err != nil {
 		return nil, util.Fatalf("failed getting users: %v", err)
 	}
-	for _, user := range userResponse.Users {
-		_, err := c.DeleteUser(user.UserName)
-		if err != nil {
-			return nil, util.Fatalf("failed deleting username=%s : %v", user.UserName, err)
+	for _, user := range usersResponse.Users {
+		users[user.UserName] = true
+		names[user.UserName] = true
+	}
+
+	for username, _ := range names {
+		_, ok := users[username]
+		if ok {
+			if viper.GetBool("verbose") {
+				log.Printf("clearing user %s\n", username)
+			}
+			_, err := c.DeleteUser(username)
+			if err != nil {
+				return nil, err
+			}
+			delete(accounts, username)
+		}
+		_, ok = accounts[username]
+		if ok {
+			if viper.GetBool("verbose") {
+				log.Printf("clearing account %s\n", username)
+			}
+			c.DeleteUser(username)
 		}
 	}
 	return &Response{Request: "clear", Success: true, Message: "cleared"}, nil

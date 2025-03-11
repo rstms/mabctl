@@ -11,6 +11,8 @@ import (
 	"github.com/studio-b12/gowebdav"
 	"net/http"
 	"strings"
+	"log"
+	"github.com/spf13/viper"
 )
 
 const VCARD_VERSION = "3.0"
@@ -67,8 +69,8 @@ func (c *DigestAuthorizedClient) Do(req *http.Request) (*http.Response, error) {
 }
 
 type CardClient struct {
-	url      string
-	username string
+	URL      string
+	Username string
 	client   *DigestAuthorizedClient
 	dav      *carddav.Client
 }
@@ -81,7 +83,6 @@ func NewClient(username, password, url, cert, key string, insecure bool) (*CardC
 			return nil, err
 		}
 	}
-
 	clientCert, err := tls.LoadX509KeyPair(cert, key)
 	if err != nil {
 		return nil, util.Fatalf("failed loading client certificate: %v", err)
@@ -140,11 +141,10 @@ func (c *CardClient) List() (*[]carddav.AddressBook, error) {
 	return &books, nil
 }
 
-func (c *CardClient) Addresses(bookname string) (*[]carddav.AddressObject, error) {
+func (c *CardClient) Addresses(path string) (*[]carddav.AddressObject, error) {
 	ctx := context.Background()
-	uri := util.BookURI(c.username, bookname)
 	query := carddav.AddressBookQuery{}
-	addrs, err := c.dav.QueryAddressBook(ctx, uri, &query)
+	addrs, err := c.dav.QueryAddressBook(ctx, path, &query)
 	if err != nil {
 		return nil, util.Fatalf("QueryAddressBook failed: %v", err)
 	}
@@ -170,23 +170,10 @@ func GetAddressUUID(address carddav.AddressObject) (string, error) {
 }
 
 func (c *CardClient) AddAddress(bookname, email, name string) (*carddav.AddressObject, error) {
-	// if email is present in bookname, return existing object
-	addrs, err := c.Addresses(bookname)
-	if err != nil {
-		return nil, err
-	}
-	for _, addr := range *addrs {
-		addrEmail, err := GetAddressEmail(addr)
-		if err != nil {
-			return nil, err
-		}
-		if addrEmail == email {
-			return &addr, nil
-		}
-	}
+	verbose := viper.GetBool("verbose")
 	ctx := context.Background()
 	uuid := uuid.New()
-	uri := util.BookURI(c.username, bookname)
+	uri := util.BookURI(c.Username, bookname)
 	path := uri + uuid.String() + ".vcf"
 	card := vcard.Card{}
 	card.SetValue("EMAIL", email)
@@ -201,9 +188,12 @@ func (c *CardClient) AddAddress(bookname, email, name string) (*carddav.AddressO
 		nameField.AdditionalName = name
 	}
 	card.SetName(&nameField)
-	_, err = c.dav.PutAddressObject(ctx, path, card)
+	result, err := c.dav.PutAddressObject(ctx, path, card)
 	if err != nil {
 		return nil, err
+	}
+	if verbose {
+	    log.Printf("PutAddressObject: %+v\n", result)
 	}
 	query := carddav.AddressBookQuery{
 		PropFilters: []carddav.PropFilter{
@@ -229,7 +219,7 @@ func (c *CardClient) AddAddress(bookname, email, name string) (*carddav.AddressO
 
 func (c *CardClient) DeleteAddress(bookname, email string) (*[]carddav.AddressObject, error) {
 	ctx := context.Background()
-	uri := util.BookURI(c.username, bookname)
+	uri := util.BookURI(c.Username, bookname)
 	addrs, err := c.QueryAddress(bookname, email)
 	if err != nil {
 		return nil, err
@@ -250,7 +240,7 @@ func (c *CardClient) DeleteAddress(bookname, email string) (*[]carddav.AddressOb
 
 func (c *CardClient) QueryAddress(bookname, email string) (*[]carddav.AddressObject, error) {
 	ctx := context.Background()
-	uri := util.BookURI(c.username, bookname)
+	uri := util.BookURI(c.Username, bookname)
 	query := carddav.AddressBookQuery{
 		PropFilters: []carddav.PropFilter{
 			carddav.PropFilter{
@@ -292,4 +282,8 @@ func (c *CardClient) ScanAddress(email string) (*[]carddav.AddressBook, error) {
 
 	}
 	return &result, nil
+}
+
+func (c *CardClient) Password() string {
+	return c.client.password
 }

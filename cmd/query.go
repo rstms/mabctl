@@ -22,25 +22,46 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"fmt"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"os"
 )
 
-var clearCmd = &cobra.Command{
-	Use:   "clear",
-	Short: "clear CardDAV config",
+var queryCmd = &cobra.Command{
+	Use:   "query USERNAME BOOK_NAME EMAIL_ADDRESS",
+	Short: "lookup an email address",
 	Long: `
-DESTRUCTIVELY delete all users, books, and addresses on the CardDAV server
+Lookup EMAIL_ADDRESS in address book BOOK_NAME of user USERNAME.
+The command will fail with an error if BOOK_NAME does not existe.
+The exit code is 0 if the address exists in the address book.
 `,
+	Args: cobra.ExactArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
-		response, err := MAB.Clear()
+		username := args[0]
+		bookname := args[1]
+		email := args[2]
+		exitCode := 1
+		response, err := MAB.QueryAddress(username, bookname, email)
 		cobra.CheckErr(err)
-
-		if !HandleResponse(response, response) {
-			PrintResponse(response.Message)
+		if len(response.Addresses) > 0 {
+			exitCode = 0
 		}
+		if !HandleResponse(response, response.Addresses) {
+			if !viper.GetBool("quiet") {
+				for _, addr := range response.Addresses {
+				    field := addr.Card.Get("EMAIL")
+				    if field == nil {
+					cobra.CheckErr(fmt.Errorf("address record has no EMAIL field: %+v", addr))
+				    }
+				    fmt.Println(field.Value)
+				}
+			}
+		}
+		os.Exit(exitCode)
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(clearCmd)
+	rootCmd.AddCommand(queryCmd)
 }

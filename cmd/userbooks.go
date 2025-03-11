@@ -24,30 +24,26 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
+	"strings"
 )
 
-var addressesCmd = &cobra.Command{
-	Use:     "addresses USERNAME BOOK_NAME",
-	Aliases: []string{"ls"},
-	Short:   "list email addresses in address book",
+var userbooksCmd = &cobra.Command{
+	Use:   "userbooks",
+	Short: "list users and books",
 	Long: `
-Output email addresses from address book identified by USERNAME and BOOK_NAME.
+Output the list of users including all address books for each user.
 `,
-	Args: cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		username := args[0]
-		booktoken := args[1]
-		response, err := MAB.Addresses(nil, username, booktoken)
+		response, err := MAB.GetUserBooks()
 		cobra.CheckErr(err)
-		if !HandleResponse(response, response.Addresses) {
-			for _, addr := range response.Addresses {
-				fmt.Println(addr.Card.Get("EMAIL").Value)
+		if !HandleResponse(response, response.UserBooks) {
+			for username, books := range response.UserBooks {
+				fmt.Printf("%s\t%s\n", username, strings.Join(books, ","))
 			}
 		}
-
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(addressesCmd)
+	rootCmd.AddCommand(userbooksCmd)
 }

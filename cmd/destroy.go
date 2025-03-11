@@ -22,32 +22,25 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
 	"github.com/spf13/cobra"
 )
 
-var addressesCmd = &cobra.Command{
-	Use:     "addresses USERNAME BOOK_NAME",
-	Aliases: []string{"ls"},
-	Short:   "list email addresses in address book",
+var destroyCmd = &cobra.Command{
+	Use:   "destroy",
+	Short: "clear all CardDAV data",
 	Long: `
-Output email addresses from address book identified by USERNAME and BOOK_NAME.
+DESTRUCTIVELY delete all users, books, and addresses on the CardDAV server
 `,
-	Args: cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		username := args[0]
-		booktoken := args[1]
-		response, err := MAB.Addresses(nil, username, booktoken)
+		response, err := MAB.Clear()
 		cobra.CheckErr(err)
-		if !HandleResponse(response, response.Addresses) {
-			for _, addr := range response.Addresses {
-				fmt.Println(addr.Card.Get("EMAIL").Value)
-			}
-		}
 
+		if !HandleResponse(response, response) {
+			PrintResponse(response.Message)
+		}
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(addressesCmd)
+	rootCmd.AddCommand(destroyCmd)
 }

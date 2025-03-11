@@ -1,14 +1,14 @@
 package api
 
 import (
-	"bufio"
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
-	"github.com/rstms/mabctl/carddav"
+	davapi "github.com/rstms/mabctl/carddav"
 	"github.com/rstms/mabctl/util"
 	"github.com/spf13/viper"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -26,55 +26,6 @@ func mkpasswd(size int) (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-func readAccounts() (map[string]string, error) {
-	viper.SetDefault("passwd", "/etc/mabctl/passwd")
-	passwd := viper.GetString("passwd")
-	accounts := make(map[string]string)
-	_, err := os.Stat(passwd)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return accounts, nil
-		}
-		return map[string]string{}, err
-	}
-	file, err := os.Open(passwd)
-	if err != nil {
-		return map[string]string{}, err
-	}
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		fields := strings.Split(scanner.Text(), ":")
-		if len(fields) != 2 {
-			return map[string]string{}, fmt.Errorf("failed parsing passwd file: %s", passwd)
-		}
-		accounts[fields[0]] = fields[1]
-	}
-	return accounts, nil
-}
-
-func writeAccounts(accounts map[string]string) error {
-	viper.SetDefault("passwd", "/etc/mabctl/passwd")
-	passwd := viper.GetString("passwd")
-	content := ""
-	for username, password := range accounts {
-		if username == "" {
-			return fmt.Errorf("illegal null username")
-		}
-		if strings.Contains(username, ":") {
-			return fmt.Errorf("illegal ':' in username: %s", username)
-		}
-		if password == "" {
-			return fmt.Errorf("illegal null username")
-		}
-		if strings.Contains(password, ":") {
-			return fmt.Errorf("illegal password character: %s", ":")
-		}
-		content += fmt.Sprintf("%s:%s\n", username, password)
-	}
-	return os.WriteFile(passwd, []byte(content), 0660)
-}
-
 func LookupDomain() (string, error) {
 	domain := viper.GetString("domain")
 	if domain == "" {
@@ -87,6 +38,7 @@ func LookupDomain() (string, error) {
 			return "", fmt.Errorf("no domain in hostname: %s\n", hostname)
 		}
 		domain = hostname[dot+1:]
+		viper.SetDefault("domain", domain)
 	}
 	return domain, nil
 }
@@ -94,34 +46,61 @@ func LookupDomain() (string, error) {
 func LookupURL() (string, error) {
 	url := viper.GetString("url")
 	if url != "" {
+		if viper.GetBool("verbose") {
+			log.Printf("LookupURL.viper url=%s\n", url)
+		}
 		return url, nil
 	}
-	domain, err := LookupDomain()
-	if err != nil {
-		return "", err
+	domain := viper.GetString("domain")
+	if viper.GetBool("verbose") {
+		log.Printf("LookupURL.viper domain=%s\n", domain)
 	}
+
 	_, records, err := net.LookupSRV("", "", fmt.Sprintf("_carddavs._tcp.%s", domain))
 	if err != nil {
 		return "", err
 	}
+
 	for _, record := range records {
-		return strings.TrimSuffix(record.Target, "."), nil
+		if viper.GetBool("verbose") {
+			log.Printf("LookupURL: SRV record: %+v\n", *record)
+		}
+		url = strings.TrimSuffix(record.Target, ".")
+		return url, nil
 	}
-	return url, fmt.Errorf("SRV lookup returned no records")
+	return "", fmt.Errorf("SRV lookup returned no records")
 }
 
 func SetDefaults() error {
+	domain, err := LookupDomain()
+	if err != nil {
+		return err
+	}
+	if viper.GetBool("verbose") {
+		log.Printf("LookupDomain: %s\n", domain)
+	}
+
 	url, err := LookupURL()
 	if err != nil {
 		return err
 	}
-	viper.SetDefault("admin_url", fmt.Sprintf("https://%s:4443/bcc", url))
+	if viper.GetBool("verbose") {
+		log.Printf("LookupURL: %s\n", url)
+	}
+
+	viper.SetDefault("bcc_url", fmt.Sprintf("https://%s:4443/bcc", url))
 	viper.SetDefault("dav_url", fmt.Sprintf("https://%s/dav.php", url))
 	viper.SetDefault("admin_username", "admin")
-	viper.SetDefault("cert", "/etc/mabctl/mabctl.pem")
-	viper.SetDefault("key", "/etc/mabctl/mabctl.key")
-	viper.SetDefault("insecure", false)
-	viper.SetDefault("passwd", "/etc/mabctl/passwd")
+	viper.SetDefault("client_cert", "/etc/mabctl/mabctl.pem")
+	viper.SetDefault("client_key", "/etc/mabctl/mabctl.key")
+	viper.SetDefault("insecure_no_validate_server_certificate", false)
+
+	for k, v := range viper.GetStringMap("domains." + domain) {
+		if viper.GetBool("verbose") {
+			log.Printf("viper domain default %s=%s\n", k, v)
+		}
+		viper.SetDefault(k, v)
+	}
 	return nil
 }
 
@@ -131,12 +110,12 @@ func NewAddressBookController() (*Controller, error) {
 		return nil, util.Fatalf("failed setting config defaults: %v", err)
 	}
 
-	clientCert, err := tls.LoadX509KeyPair(viper.GetString("cert"), viper.GetString("key"))
+	clientCert, err := tls.LoadX509KeyPair(viper.GetString("client_cert"), viper.GetString("client_key"))
 	if err != nil {
 		return nil, util.Fatalf("failed loading client certificate: %v", err)
 	}
 	tlsConfig := &tls.Config{Certificates: []tls.Certificate{clientCert},
-		InsecureSkipVerify: viper.GetBool("insecure"),
+		InsecureSkipVerify: viper.GetBool("insecure_no_validate_server_certificate"),
 	}
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -147,7 +126,7 @@ func NewAddressBookController() (*Controller, error) {
 	c := Controller{
 		viper.GetString("admin_username"),
 		viper.GetString("admin_password"),
-		viper.GetString("admin_url"),
+		viper.GetString("bcc_url"),
 		viper.GetString("api_key"),
 		client,
 	}
@@ -155,17 +134,15 @@ func NewAddressBookController() (*Controller, error) {
 	return &c, nil
 }
 
-func (c *Controller) davClient(username string) (*carddav.CardClient, error) {
-	passwordResponse, err := c.GetPassword(username)
+func (c *Controller) davClient(username string) (*davapi.CardClient, error) {
+	response, err := c.GetPassword(username)
 	if err != nil {
 		return nil, err
 	}
-	if !passwordResponse.Success {
-		return nil, fmt.Errorf("Unknown user: %s", username)
-	}
+	password := response.Password
 	url := viper.GetString("dav_url")
-	cert := viper.GetString("cert")
-	key := viper.GetString("key")
-	insecure := viper.GetBool("insecure")
-	return carddav.NewClient(username, passwordResponse.Password, url, cert, key, insecure)
+	cert := viper.GetString("client_cert")
+	key := viper.GetString("client_key")
+	insecure := viper.GetBool("insecure_no_validate_server_certificate")
+	return davapi.NewClient(username, password, url, cert, key, insecure)
 }

@@ -9,7 +9,7 @@ import (
 // return username, bookname from token
 func ParseBookToken(username, token string) (string, string, error) {
 	if token == "default" {
-		return username, token, nil
+		return username, "Default Address Book", nil
 	}
 	fields := strings.SplitN(token, "-", 4)
 	if len(fields) == 4 {
@@ -22,8 +22,8 @@ func ParseBookToken(username, token string) (string, string, error) {
 
 // return book token from username, bookname
 func BookToken(username, bookname string) string {
-	if bookname == "default" {
-		return bookname
+	if strings.ToLower(bookname) == "default address book" {
+		return "default"
 	}
 	raw := username + "-" + bookname
 	token := ""

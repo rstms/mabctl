@@ -35,9 +35,11 @@ Write the CardDAV password for USERNAME to stdout
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		username := args[0]
-		password, err := MAB.GetPassword(username)
+		response, err := MAB.GetPassword(username)
 		cobra.CheckErr(err)
-		fmt.Println(password)
+		if !HandleResponse(response, response.Password) {
+			fmt.Println(response.Password)
+		}
 	},
 }
 

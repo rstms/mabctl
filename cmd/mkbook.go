@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
+	"fmt"
 )
 
 var mkbookCmd = &cobra.Command{
@@ -41,7 +42,9 @@ Add a new CardDAV address book for USERNAME
 		}
 		response, err := MAB.AddBook(username, bookname, description)
 		cobra.CheckErr(err)
-		HandleResponse(response, response.Book)
+		if !HandleResponse(response, response.Book) {
+			fmt.Println(response.Book.URI)
+		}
 	},
 }
 
