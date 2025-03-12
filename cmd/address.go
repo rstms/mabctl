@@ -24,30 +24,42 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"os"
 )
 
-var addressesCmd = &cobra.Command{
-	Use:     "addresses USERNAME BOOK_NAME",
-	Aliases: []string{"ls"},
-	Short:   "list email addresses in address book",
+var addrCmd = &cobra.Command{
+	Use:   "addr USERNAME BOOK_NAME EMAIL_ADDRESS",
+	Short: "lookup an email address",
 	Long: `
-Output email addresses from address book identified by USERNAME and BOOK_NAME.
+Lookup EMAIL_ADDRESS in address book BOOK_NAME of user USERNAME.
+The command will fail with an error if BOOK_NAME does not existe.
+The exit code is 0 if the address exists in the address book.
 `,
-	Args: cobra.ExactArgs(2),
+	Args: cobra.ExactArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
 		username := args[0]
-		booktoken := args[1]
-		response, err := MAB.Addresses(nil, username, booktoken)
+		bookname := args[1]
+		email := args[2]
+		response, err := MAB.QueryAddress(username, bookname, email)
 		cobra.CheckErr(err)
-		if !HandleResponse(response, response.Addresses) {
-			for _, addr := range response.Addresses {
-				fmt.Println(addr.Card.Get("EMAIL").Value)
+		exitCode := 1
+		if response.Address == nil {
+		    exitCode = 1
+		}
+		if !HandleResponse(response, response.Address) {
+			if !viper.GetBool("quiet") {
+			    if response.Address != nil {
+			    email, err := MAB.EmailAddress(*response.Address)
+			    cobra.CheckErr(err)
+			    fmt.Println(email)
+			    }
 			}
 		}
-
+		os.Exit(exitCode)
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(addressesCmd)
+	rootCmd.AddCommand(addrCmd)
 }

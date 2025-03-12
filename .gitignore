@@ -29,3 +29,4 @@ mabctl
 *.core
 *.json
 headers
+postactivate
