@@ -68,7 +68,7 @@ type AddUserResponse struct {
 
 type BooksResponse struct {
 	Response
-	Books []Book `json:"books"`
+	Books []Book	`json:"books"`
 }
 
 type AddBookResponse struct {
@@ -303,11 +303,11 @@ func (c *Controller) GetUserBooks() (*UserBooksResponse, error) {
 		if err != nil {
 			return nil, err
 		}
-		books := []string{}
-		for _, book := range booksResponse.Books {
-			books = append(books, book.BookName)
+		books := make([]string, len(booksResponse.Books))
+		for i, book := range booksResponse.Books {
+		    books[i] = book.BookName
 		}
-		ret.UserBooks[user.UserName] = books
+	    	ret.UserBooks[user.UserName] = books
 	}
 	return &ret, nil
 }
