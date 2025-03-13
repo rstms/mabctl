@@ -487,7 +487,7 @@ func (c *Controller) convertBook(dav *davapi.CardClient, davBook *carddav.Addres
 		if uriIndex == -1 {
 			return nil, util.Fatalf("convertBook uri parse failed: %s", davBook.Path)
 		}
-		book.URI = fmt.Sprintf("%s%s", viper.GetString("dav_url"), davBook.Path[uriIndex:])
+		book.URI = fmt.Sprintf("%s%s", viper.GetString("mabctl.dav_url"), davBook.Path[uriIndex:])
 
 		addressesResponse, err := c.Addresses(dav, username, bookname)
 		if err != nil {
@@ -821,7 +821,6 @@ func (c *Controller) Restore(dump *ConfigDump, restoreUser string) (*Response, e
 		resultCount++
 
 		go func(username string, jobs []BookAddrs, results chan RestoreResult) {
-			verbose := viper.GetBool("verbose")
 			if verbose {
 				log.Printf("restore[%s]: begin\n", username)
 			}
@@ -875,6 +874,7 @@ func (c *Controller) Restore(dump *ConfigDump, restoreUser string) (*Response, e
 }
 
 func (c *Controller) Clear() (*Response, error) {
+	verbose := viper.GetBool("verbose")
 	users := make(map[string]bool)
 	accounts := make(map[string]bool)
 	names := make(map[string]bool)
@@ -900,7 +900,7 @@ func (c *Controller) Clear() (*Response, error) {
 	for username, _ := range names {
 		_, ok := users[username]
 		if ok {
-			if viper.GetBool("verbose") {
+			if verbose {
 				log.Printf("clearing user %s\n", username)
 			}
 			_, err := c.DeleteUser(username)
@@ -911,7 +911,7 @@ func (c *Controller) Clear() (*Response, error) {
 		}
 		_, ok = accounts[username]
 		if ok {
-			if viper.GetBool("verbose") {
+			if verbose {
 				log.Printf("clearing account %s\n", username)
 			}
 			c.DeleteUser(username)
