@@ -46,6 +46,7 @@ type Book struct {
 
 type Response struct {
 	Success bool   `json:"success"`
+	User string `json:"user"`
 	Message string `json:"message"`
 	Request string `json:"request"`
 }
@@ -67,7 +68,7 @@ type AddUserResponse struct {
 
 type BooksResponse struct {
 	Response
-	Books []Book `json:"books"`
+	Books []Book	`json:"books"`
 }
 
 type AddBookResponse struct {
@@ -87,12 +88,12 @@ type ErrorResponse struct {
 
 type AddressesResponse struct {
 	Response
-	Addresses []carddav.AddressObject `json:"addresses"`
+	Addresses []string `json:"addresses"`
 }
 
 type AddressResponse struct {
 	Response
-	Address carddav.AddressObject `json:"address"`
+	Address *carddav.AddressObject `json:"address"`
 }
 
 type AccountResponse struct {
@@ -302,11 +303,11 @@ func (c *Controller) GetUserBooks() (*UserBooksResponse, error) {
 		if err != nil {
 			return nil, err
 		}
-		books := []string{}
-		for _, book := range booksResponse.Books {
-			books = append(books, book.BookName)
+		books := make([]string, len(booksResponse.Books))
+		for i, book := range booksResponse.Books {
+		    books[i] = book.BookName
 		}
-		ret.UserBooks[user.UserName] = books
+	    	ret.UserBooks[user.UserName] = books
 	}
 	return &ret, nil
 }
@@ -429,15 +430,22 @@ func (c *Controller) Addresses(dav *davapi.CardClient, username, bookname string
 	if err != nil {
 		return nil, err
 	}
-	addrs, err := dav.Addresses(path)
+	davAddrs, err := dav.Addresses(path)
 	if err != nil {
 		return nil, err
 	}
+
+	addrs, err := c.EmailAddressList(davAddrs)
+	if err != nil {
+	    return nil, err
+	}
+
 	response := AddressesResponse{}
 	response.Success = true
-	response.Request = "CardDAV address query"
+	response.Request = "address book addresses"
 	response.Message = fmt.Sprintf("%s %s addresses", username, bookname)
 	response.Addresses = *addrs
+
 	return &response, nil
 }
 
@@ -479,7 +487,7 @@ func (c *Controller) convertBook(dav *davapi.CardClient, davBook *carddav.Addres
 		if uriIndex == -1 {
 			return nil, util.Fatalf("convertBook uri parse failed: %s", davBook.Path)
 		}
-		book.URI = fmt.Sprintf("%s%s", viper.GetString("dav_url"), davBook.Path[uriIndex:])
+		book.URI = fmt.Sprintf("%s%s", viper.GetString("mabctl.dav_url"), davBook.Path[uriIndex:])
 
 		addressesResponse, err := c.Addresses(dav, username, bookname)
 		if err != nil {
@@ -511,7 +519,7 @@ func (c *Controller) AddAddress(dav *davapi.CardClient, username, bookname, emai
 	    if verbose {
 		log.Printf("AddAddress: found existing: %+v\n", addr)
 	    }
-	    response.Address = addr
+	    response.Address = &addr
 	    response.Message = fmt.Sprintf("existing %s", email)
 	    return &response, nil
 	}
@@ -520,10 +528,31 @@ func (c *Controller) AddAddress(dav *davapi.CardClient, username, bookname, emai
 	    if err != nil {
 		return nil, err
 	    }
-	    response.Address = *added
+	    response.Address = added
 	    response.Message = fmt.Sprintf("added %s", email)
 	    return &response, nil
 
+}
+
+func (c *Controller) EmailAddress(addr carddav.AddressObject) (string, error) {
+	    field := addr.Card.Get("EMAIL")
+	    if field == nil {
+		return "", util.Fatalf("cardDAV address EMAIL lookup failed: %+v", addr)
+	    }
+	    return field.Value, nil
+}
+
+func (c *Controller) EmailAddressList(addrs *[]carddav.AddressObject) (*[]string, error) {
+	ret := []string{}
+	for _, addr := range *addrs {
+	    email, err := c.EmailAddress(addr)
+	    if err != nil {
+		return nil, err
+	    }
+
+	    ret = append(ret, email)
+	}
+	return &ret, nil
 }
 
 func (c *Controller) DeleteAddress(username, bookname, email string) (*AddressesResponse, error) {
@@ -535,6 +564,10 @@ func (c *Controller) DeleteAddress(username, bookname, email string) (*Addresses
 	if err != nil {
 		return nil, err
 	}
+	addrs, err := c.EmailAddressList(deleted)
+	if err != nil {
+	    return nil, err
+	}
 	response := AddressesResponse{}
 	response.Success = true
 	response.Request = fmt.Sprintf("Delete CardDAV address: %s", email)
@@ -543,11 +576,11 @@ func (c *Controller) DeleteAddress(username, bookname, email string) (*Addresses
 	} else {
 		response.Message = fmt.Sprintf("deleted: %d", len(*deleted))
 	}
-	response.Addresses = *deleted
+	response.Addresses = *addrs 
 	return &response, nil
 }
 
-func (c *Controller) QueryAddress(username, bookname, email string) (*AddressesResponse, error) {
+func (c *Controller) QueryAddress(username, bookname, email string) (*AddressResponse, error) {
 	dav, err := c.davClient(username)
 	if err != nil {
 		return nil, err
@@ -555,16 +588,18 @@ func (c *Controller) QueryAddress(username, bookname, email string) (*AddressesR
 	found, err := dav.QueryAddress(bookname, email)
 	if err != nil {
 		return nil, err
-	}
-	response := AddressesResponse{}
+	    }
+	
+	response := AddressResponse{}
 	response.Success = true
 	response.Request = fmt.Sprintf("Query CardDAV address: %s", email)
 	if len(*found) == 0 {
 		response.Message = fmt.Sprintf("not found: %s", email)
+		response.Address = nil
 	} else {
 		response.Message = fmt.Sprintf("found: %d", len(*found))
+		response.Address = &(*found)[0]
 	}
-	response.Addresses = *found
 	return &response, nil
 }
 
@@ -633,7 +668,7 @@ func (c *Controller) SetAccounts(request *UserAccountsRequest) (*UserAccountsRes
 	return &response, nil
 }
 
-func (c *Controller) Dump() (*DumpResponse, error) {
+func (c *Controller) Dump(dumpUser string) (*DumpResponse, error) {
 	verbose := viper.GetBool("verbose")
 	dump := ConfigDump{Users: make(map[string]UserDump)}
 	usersResponse, err := c.GetUsers()
@@ -650,7 +685,12 @@ func (c *Controller) Dump() (*DumpResponse, error) {
 	if err != nil {
 	    return nil, err
 	}
+	resultCount := 0
 	for _, user := range usersResponse.Users {
+		if dumpUser != "" && user.UserName != dumpUser {
+		    continue
+		}
+		resultCount++
 		go func(username string, accounts map[string]string) {
 			if verbose {
 				log.Printf("dumping user %s\n", username)
@@ -694,15 +734,10 @@ func (c *Controller) Dump() (*DumpResponse, error) {
 						return
 					}
 					userdump.Books[book.BookName] = make([]string, len(addressesResponse.Addresses))
-					for i, addr := range addressesResponse.Addresses {
-						email := addr.Card.Get("EMAIL")
-						if email == nil {
-							results <- DumpResult{username, util.Fatalf("null EMAIL value: username=%s bookname=%s %v", username, book.BookName, i), UserDump{}}
-							return
-						}
-						userdump.Books[book.BookName][i] = email.Value
+					for i, email := range addressesResponse.Addresses {
+						userdump.Books[book.BookName][i] = email
 						if verbose {
-							log.Printf("dumping address %s/%s/%s\n", username, book.BookName, email.Value)
+							log.Printf("dumping address %s/%s/%s\n", username, book.BookName, email)
 						}
 					}
 				}
@@ -712,7 +747,7 @@ func (c *Controller) Dump() (*DumpResponse, error) {
 
 	}
 
-	for i := 0; i < len(usersResponse.Users); i++ {
+	for i := 0; i < resultCount; i++ {
 		result := <-results
 		if result.err != nil {
 			err = result.err
@@ -725,13 +760,16 @@ func (c *Controller) Dump() (*DumpResponse, error) {
 	}
 	var ret DumpResponse
 	ret.Success = true
-	ret.Request = "dump"
+	ret.Request = "dump all"
+	if dumpUser != "" {
+	    ret.Request = fmt.Sprintf("dump user %s", dumpUser)
+	}
 	ret.Message = "dumped"
 	ret.Dump = dump
 	return &ret, nil
 }
 
-func (c *Controller) Restore(dump *ConfigDump) (*Response, error) {
+func (c *Controller) Restore(dump *ConfigDump, restoreUser string) (*Response, error) {
 	verbose := viper.GetBool("verbose")
 	type RestoreResult struct {
 		username string
@@ -746,6 +784,9 @@ func (c *Controller) Restore(dump *ConfigDump) (*Response, error) {
 	userbooks := make(map[string][]BookAddrs)
 
 	for username, user := range dump.Users {
+		if restoreUser != "" && username != restoreUser {
+		    continue
+		}
 		_, err := c.AddUser(username, username, user.Password)
 		if err != nil {
 			return nil, util.Fatalf("failed restoring username=%s: %v", username, err)
@@ -772,9 +813,14 @@ func (c *Controller) Restore(dump *ConfigDump) (*Response, error) {
 		userbooks[username] = userjobs
 	}
 
+	resultCount := 0
 	for username, jobs := range userbooks {
+		if restoreUser != "" && username != restoreUser {
+		    continue 
+		}
+		resultCount++
+
 		go func(username string, jobs []BookAddrs, results chan RestoreResult) {
-			verbose := viper.GetBool("verbose")
 			if verbose {
 				log.Printf("restore[%s]: begin\n", username)
 			}
@@ -815,7 +861,7 @@ func (c *Controller) Restore(dump *ConfigDump) (*Response, error) {
 
 	errors := []string{}
 
-	for i := 0; i < len(dump.Users); i++ {
+	for i := 0; i < resultCount; i++ {
 		result := <-results
 		if result.err != nil {
 			errors = append(errors, fmt.Sprintf("restore[%s] fail: %v", result.username, result.err))
@@ -828,6 +874,7 @@ func (c *Controller) Restore(dump *ConfigDump) (*Response, error) {
 }
 
 func (c *Controller) Clear() (*Response, error) {
+	verbose := viper.GetBool("verbose")
 	users := make(map[string]bool)
 	accounts := make(map[string]bool)
 	names := make(map[string]bool)
@@ -853,7 +900,7 @@ func (c *Controller) Clear() (*Response, error) {
 	for username, _ := range names {
 		_, ok := users[username]
 		if ok {
-			if viper.GetBool("verbose") {
+			if verbose {
 				log.Printf("clearing user %s\n", username)
 			}
 			_, err := c.DeleteUser(username)
@@ -864,7 +911,7 @@ func (c *Controller) Clear() (*Response, error) {
 		}
 		_, ok = accounts[username]
 		if ok {
-			if viper.GetBool("verbose") {
+			if verbose {
 				log.Printf("clearing account %s\n", username)
 			}
 			c.DeleteUser(username)

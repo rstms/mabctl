@@ -32,7 +32,7 @@ import (
 	"strings"
 )
 
-const Version = "1.4.4"
+const Version = "1.5.7"
 
 const ProgramName = "mabctl"
 
@@ -81,6 +81,7 @@ func init() {
 	optionSwitch("json", "j", "select JSON output")
 	optionSwitch("verbose", "v", "enable diagnostic output")
 	optionSwitch("quiet", "q", "suppress output")
+	optionSwitch("force", "", "enable destructive operations")
 	optionString("domain", "d", "", "CardDAV server domain")
 	optionString("admin-username", "U", "admin", "baikal admin username")
 	optionString("admin-password", "P", "", "baikal admin password")
@@ -112,7 +113,7 @@ func optionString(name, flag, value, description string) {
 	} else {
 		rootCmd.PersistentFlags().StringP(name, flag, value, description)
 	}
-	viper.BindPFlag(viperKey(name), rootCmd.PersistentFlags().Lookup(name))
+	viper.BindPFlag("mabctl." + viperKey(name), rootCmd.PersistentFlags().Lookup(name))
 }
 
 func pathname(filename string) string {

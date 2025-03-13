@@ -15,7 +15,7 @@ import (
 	"strings"
 )
 
-const Version = "1.4.4"
+const Version = "1.5.7"
 
 func mkpasswd(size int) (string, error) {
 	bytes := make([]byte, size)
@@ -27,7 +27,7 @@ func mkpasswd(size int) (string, error) {
 }
 
 func LookupDomain() (string, error) {
-	domain := viper.GetString("domain")
+	domain := viper.GetString("mabctl.domain")
 	if domain == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
@@ -38,22 +38,23 @@ func LookupDomain() (string, error) {
 			return "", fmt.Errorf("no domain in hostname: %s\n", hostname)
 		}
 		domain = hostname[dot+1:]
-		viper.SetDefault("domain", domain)
+		viper.SetDefault("mabctl.domain", domain)
 	}
 	return domain, nil
 }
 
 func LookupURL() (string, error) {
-	url := viper.GetString("url")
+	verbose := viper.GetBool("verbose")
+	url := viper.GetString("mabctl.url")
 	if url != "" {
-		if viper.GetBool("verbose") {
-			log.Printf("LookupURL.viper url=%s\n", url)
+		if verbose {
+		    log.Printf("LookupURL using viper mabct.url=%s\n", url)
 		}
 		return url, nil
 	}
-	domain := viper.GetString("domain")
-	if viper.GetBool("verbose") {
-		log.Printf("LookupURL.viper domain=%s\n", domain)
+	domain := viper.GetString("mabctl.domain")
+	if verbose {
+		log.Printf("LookupURL using viper mabctl.domain=%s\n", domain)
 	}
 
 	_, records, err := net.LookupSRV("", "", fmt.Sprintf("_carddavs._tcp.%s", domain))
@@ -62,7 +63,7 @@ func LookupURL() (string, error) {
 	}
 
 	for _, record := range records {
-		if viper.GetBool("verbose") {
+		if verbose {
 			log.Printf("LookupURL: SRV record: %+v\n", *record)
 		}
 		url = strings.TrimSuffix(record.Target, ".")
@@ -72,11 +73,12 @@ func LookupURL() (string, error) {
 }
 
 func SetDefaults() error {
+	verbose := viper.GetBool("verbose")
 	domain, err := LookupDomain()
 	if err != nil {
 		return err
 	}
-	if viper.GetBool("verbose") {
+	if verbose {
 		log.Printf("LookupDomain: %s\n", domain)
 	}
 
@@ -84,22 +86,26 @@ func SetDefaults() error {
 	if err != nil {
 		return err
 	}
-	if viper.GetBool("verbose") {
+	if verbose {
 		log.Printf("LookupURL: %s\n", url)
 	}
 
-	viper.SetDefault("bcc_url", fmt.Sprintf("https://%s:4443/bcc", url))
-	viper.SetDefault("dav_url", fmt.Sprintf("https://%s/dav.php", url))
-	viper.SetDefault("admin_username", "admin")
-	viper.SetDefault("client_cert", "/etc/mabctl/mabctl.pem")
-	viper.SetDefault("client_key", "/etc/mabctl/mabctl.key")
-	viper.SetDefault("insecure_no_validate_server_certificate", false)
+	viper.SetDefault("mabctl.bcc_url", fmt.Sprintf("https://%s:4443/bcc", url))
+	viper.SetDefault("mabctl.dav_url", fmt.Sprintf("https://%s/dav.php", url))
+	viper.SetDefault("mabctl.admin_username", "admin")
+	viper.SetDefault("mabctl.client_cert", "/etc/mabctl/mabctl.pem")
+	viper.SetDefault("mabctl.client_key", "/etc/mabctl/mabctl.key")
+	viper.SetDefault("mabctl.insecure_no_validate_server_certificate", false)
 
-	for k, v := range viper.GetStringMap("domains." + domain) {
-		if viper.GetBool("verbose") {
-			log.Printf("viper domain default %s=%s\n", k, v)
+	for k, v := range viper.GetStringMap("mabctl.domains." + domain) {
+		if verbose {
+			logValue := v.(string)
+			if k == "api_key" || k == "admin_password" {
+			    logValue = logValue[:4] + ".........."
+			}
+			log.Printf("viper domain default %s=%s\n", k, logValue)
 		}
-		viper.SetDefault(k, v)
+		viper.SetDefault("mabctl." + k, v)
 	}
 	return nil
 }
@@ -110,12 +116,12 @@ func NewAddressBookController() (*Controller, error) {
 		return nil, util.Fatalf("failed setting config defaults: %v", err)
 	}
 
-	clientCert, err := tls.LoadX509KeyPair(viper.GetString("client_cert"), viper.GetString("client_key"))
+	clientCert, err := tls.LoadX509KeyPair(viper.GetString("mabctl.client_cert"), viper.GetString("mabctl.client_key"))
 	if err != nil {
 		return nil, util.Fatalf("failed loading client certificate: %v", err)
 	}
 	tlsConfig := &tls.Config{Certificates: []tls.Certificate{clientCert},
-		InsecureSkipVerify: viper.GetBool("insecure_no_validate_server_certificate"),
+		InsecureSkipVerify: viper.GetBool("mabctl.insecure_no_validate_server_certificate"),
 	}
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -124,10 +130,10 @@ func NewAddressBookController() (*Controller, error) {
 	}
 
 	c := Controller{
-		viper.GetString("admin_username"),
-		viper.GetString("admin_password"),
-		viper.GetString("bcc_url"),
-		viper.GetString("api_key"),
+		viper.GetString("mabctl.admin_username"),
+		viper.GetString("mabctl.admin_password"),
+		viper.GetString("mabctl.bcc_url"),
+		viper.GetString("mabctl.api_key"),
 		client,
 	}
 
@@ -140,9 +146,9 @@ func (c *Controller) davClient(username string) (*davapi.CardClient, error) {
 		return nil, err
 	}
 	password := response.Password
-	url := viper.GetString("dav_url")
-	cert := viper.GetString("client_cert")
-	key := viper.GetString("client_key")
-	insecure := viper.GetBool("insecure_no_validate_server_certificate")
+	url := viper.GetString("mabctl.dav_url")
+	cert := viper.GetString("mabctl.client_cert")
+	key := viper.GetString("mabctl.client_key")
+	insecure := viper.GetBool("mabctl.insecure_no_validate_server_certificate")
 	return davapi.NewClient(username, password, url, cert, key, insecure)
 }
