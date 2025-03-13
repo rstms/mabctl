@@ -81,6 +81,7 @@ func init() {
 	optionSwitch("json", "j", "select JSON output")
 	optionSwitch("verbose", "v", "enable diagnostic output")
 	optionSwitch("quiet", "q", "suppress output")
+	optionSwitch("force", "", "enable destructive operations")
 	optionString("domain", "d", "", "CardDAV server domain")
 	optionString("admin-username", "U", "admin", "baikal admin username")
 	optionString("admin-password", "P", "", "baikal admin password")

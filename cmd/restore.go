@@ -26,8 +26,11 @@ import (
 	"fmt"
 	"github.com/rstms/mabctl/api"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"os"
 )
+
+var restoreUser string
 
 var restoreCmd = &cobra.Command{
 	Use:   "restore [FILENAME]",
@@ -54,7 +57,18 @@ provided read from the file.  If FILENAME is absent or '-' read from STDIN
 		decoder := json.NewDecoder(file)
 		err = decoder.Decode(&dump)
 		cobra.CheckErr(err)
-		response, err := MAB.Restore(&dump)
+
+		if viper.GetBool("force") {
+		    if restoreUser != "" {
+			_, err := MAB.DeleteUser(restoreUser)
+			cobra.CheckErr(err)
+		    } else {
+			_, err := MAB.Clear()
+			cobra.CheckErr(err)
+		    }
+		}
+
+		response, err := MAB.Restore(&dump, restoreUser)
 		cobra.CheckErr(err)
 		if !HandleResponse(response, response) {
 			fmt.Println(response.Message)
@@ -63,5 +77,6 @@ provided read from the file.  If FILENAME is absent or '-' read from STDIN
 }
 
 func init() {
+	restoreCmd.Flags().StringVar(&restoreUser, "user", "", "restore username")
 	rootCmd.AddCommand(restoreCmd)
 }

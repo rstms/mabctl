@@ -769,7 +769,7 @@ func (c *Controller) Dump(dumpUser string) (*DumpResponse, error) {
 	return &ret, nil
 }
 
-func (c *Controller) Restore(dump *ConfigDump) (*Response, error) {
+func (c *Controller) Restore(dump *ConfigDump, restoreUser string) (*Response, error) {
 	verbose := viper.GetBool("verbose")
 	type RestoreResult struct {
 		username string
@@ -784,6 +784,9 @@ func (c *Controller) Restore(dump *ConfigDump) (*Response, error) {
 	userbooks := make(map[string][]BookAddrs)
 
 	for username, user := range dump.Users {
+		if restoreUser != "" && username != restoreUser {
+		    continue
+		}
 		_, err := c.AddUser(username, username, user.Password)
 		if err != nil {
 			return nil, util.Fatalf("failed restoring username=%s: %v", username, err)
@@ -810,7 +813,13 @@ func (c *Controller) Restore(dump *ConfigDump) (*Response, error) {
 		userbooks[username] = userjobs
 	}
 
+	resultCount := 0
 	for username, jobs := range userbooks {
+		if restoreUser != "" && username != restoreUser {
+		    continue 
+		}
+		resultCount++
+
 		go func(username string, jobs []BookAddrs, results chan RestoreResult) {
 			verbose := viper.GetBool("verbose")
 			if verbose {
@@ -853,7 +862,7 @@ func (c *Controller) Restore(dump *ConfigDump) (*Response, error) {
 
 	errors := []string{}
 
-	for i := 0; i < len(dump.Users); i++ {
+	for i := 0; i < resultCount; i++ {
 		result := <-results
 		if result.err != nil {
 			errors = append(errors, fmt.Sprintf("restore[%s] fail: %v", result.username, result.err))

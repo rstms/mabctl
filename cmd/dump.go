@@ -26,6 +26,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+var dumpUser string
+
 var dumpCmd = &cobra.Command{
 	Use:   "dump [USERNAME]",
 	Short: "dump CardDAV config",
@@ -38,6 +40,9 @@ Output all cardDAV data for USERNAME.  If USERNAME is not specified, output data
 		if len(args) > 0 {
 		    user = args[0]
 		}
+		if dumpUser != "" {
+		    user = dumpUser
+		}
 		response, err := MAB.Dump(user)
 		cobra.CheckErr(err)
 
@@ -49,5 +54,6 @@ Output all cardDAV data for USERNAME.  If USERNAME is not specified, output data
 }
 
 func init() {
+	dumpCmd.Flags().StringVar(&dumpUser, "user", "", "dump username")
 	rootCmd.AddCommand(dumpCmd)
 }
