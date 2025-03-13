@@ -113,7 +113,7 @@ func optionString(name, flag, value, description string) {
 	} else {
 		rootCmd.PersistentFlags().StringP(name, flag, value, description)
 	}
-	viper.BindPFlag(viperKey(name), rootCmd.PersistentFlags().Lookup(name))
+	viper.BindPFlag("mabctl." + viperKey(name), rootCmd.PersistentFlags().Lookup(name))
 }
 
 func pathname(filename string) string {
