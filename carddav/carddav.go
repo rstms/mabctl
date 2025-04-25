@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"time"
 	"github.com/emersion/go-vcard"
 	"github.com/emersion/go-webdav/carddav"
 	"github.com/google/uuid"
@@ -93,6 +94,7 @@ func NewClient(username, password, url, cert, key string, insecure bool) (*CardC
 	httpClient := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: tlsConfig,
+			IdleConnTimeout: 5 * time.Second,
 		},
 	}
 

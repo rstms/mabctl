@@ -9,10 +9,11 @@ import (
 
 func initConfig(t *testing.T) {
 	viper.SetConfigType("yaml")
-	viper.SetConfigFile("/etc/mabctl/config")
+	viper.SetConfigFile("/etc/mabctl/config.yaml")
 	err := viper.ReadInConfig()
 	require.Nil(t, err)
 	viper.Set("verbose", true)
+	viper.Set("hostname", "radicale.mailcapsule.io")
 }
 
 func TestApiInit(t *testing.T) {

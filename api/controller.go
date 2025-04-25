@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
+	"time"
 	davapi "github.com/rstms/mabctl/carddav"
 	"github.com/rstms/mabctl/util"
 	"github.com/spf13/viper"
@@ -126,6 +127,7 @@ func NewAddressBookController() (*Controller, error) {
 	client := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: tlsConfig,
+			IdleConnTimeout: 5 * time.Second,
 		},
 	}
 
@@ -139,6 +141,7 @@ func NewAddressBookController() (*Controller, error) {
 
 	return &c, nil
 }
+
 
 func (c *Controller) davClient(username string) (*davapi.CardClient, error) {
 	response, err := c.GetPassword(username)
