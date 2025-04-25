@@ -128,6 +128,7 @@ func NewAddressBookController() (*Controller, error) {
 		Transport: &http.Transport{
 			TLSClientConfig: tlsConfig,
 			IdleConnTimeout: 5 * time.Second,
+			DisableKeepAlives: true,
 		},
 	}
 
