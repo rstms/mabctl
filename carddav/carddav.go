@@ -96,7 +96,6 @@ func NewClient(username, password, url, cert, key string, insecure bool) (*CardC
 		Transport: &http.Transport{
 			TLSClientConfig: tlsConfig,
 			IdleConnTimeout: 5 * time.Second,
-			DisableKeepAlives: true,
 		},
 	}
 
