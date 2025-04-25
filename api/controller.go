@@ -16,7 +16,7 @@ import (
 	"strings"
 )
 
-const Version = "1.5.11"
+const Version = "1.5.12"
 
 func mkpasswd(size int) (string, error) {
 	bytes := make([]byte, size)
