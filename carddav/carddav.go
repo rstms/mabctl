@@ -51,6 +51,7 @@ func (c *DigestAuthorizedClient) Do(req *http.Request) (*http.Response, error) {
 	}
 	if resp.StatusCode == http.StatusUnauthorized {
 		var err error
+		defer resp.Body.Close()
 		c.auth, err = gowebdav.NewDigestAuth(c.username, c.password, resp)
 		if err != nil {
 			return nil, fmt.Errorf("DigestAuthClient: digest auth create: %v", err)
@@ -99,18 +100,19 @@ func NewClient(username, password, url, cert, key string, insecure bool) (*CardC
 		},
 	}
 
-	client := DigestAuthorizedClient{httpClient, username, password, nil}
-	dav, err := carddav.NewClient(&client, url)
+	client := &DigestAuthorizedClient{httpClient, username, password, nil}
+	dav, err := carddav.NewClient(client, url)
 	if err != nil {
 		return nil, util.Fatalf("failed creating webdav client: %v", err)
 	}
-	c := CardClient{url, username, &client, dav}
+	c := CardClient{url, username, client, dav}
 	err = c.dav.HasSupport(context.Background())
 	if err != nil {
 		return nil, err
 	}
 	return &c, nil
 }
+
 
 func discover(username string) (string, error) {
 
