@@ -13,10 +13,14 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"sync"
 	"strings"
 )
 
 const Version = "1.5.14"
+
+var mabctlDefaultsSet bool
+var mabctlDefaultsLock sync.Mutex
 
 func mkpasswd(size int) (string, error) {
 	bytes := make([]byte, size)
@@ -39,7 +43,6 @@ func LookupDomain() (string, error) {
 			return "", fmt.Errorf("no domain in hostname: %s\n", hostname)
 		}
 		domain = hostname[dot+1:]
-		viper.SetDefault("mabctl.domain", domain)
 	}
 	return domain, nil
 }
@@ -74,6 +77,11 @@ func LookupURL() (string, error) {
 }
 
 func SetDefaults() error {
+	mabctlDefaultsLock.Lock();
+	defer mabctlDefaultsLock.Unlock();
+	if mabctlDefaultsSet {
+	    return nil
+	}
 	verbose := viper.GetBool("verbose")
 	domain, err := LookupDomain()
 	if err != nil {
@@ -108,12 +116,13 @@ func SetDefaults() error {
 		}
 		viper.SetDefault("mabctl." + k, v)
 	}
+	mabctlDefaultsSet = true
 	return nil
 }
 
 func NewAddressBookController() (*Controller, error) {
 	err := SetDefaults()
-	if err != nil {
+	    if err != nil {
 		return nil, util.Fatalf("failed setting config defaults: %v", err)
 	}
 
