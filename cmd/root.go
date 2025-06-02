@@ -32,7 +32,7 @@ import (
 	"strings"
 )
 
-const Version = "1.5.16"
+const Version = "1.5.17"
 
 const ProgramName = "mabctl"
 
