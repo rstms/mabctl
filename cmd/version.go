@@ -24,6 +24,7 @@ package cmd
 import (
 	"fmt"
 
+	"os"
 	"github.com/spf13/cobra"
 )
 
@@ -35,10 +36,15 @@ var versionCmd = &cobra.Command{
 Output version"
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("mabctl v%s\n", Version)
+	    PrintVersion()
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(versionCmd)
+}
+
+func PrintVersion() {
+		fmt.Printf("mabctl version %s\n", Version)
+		os.Exit(0)
 }

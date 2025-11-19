@@ -57,7 +57,12 @@ CLI toolkit for administering a baikal carddav/caldav server.
 		cobra.CheckErr(err)
 	},
 	//PersistentPostRun: func(cmd *cobra.Command, args []string) {},
-	//Run: func(cmd *cobra.Command, args []string) {},
+	Run: func(cmd *cobra.Command, args []string) {
+	    if viper.GetBool("version") {
+		PrintVersion()
+	    }
+	    cmd.Usage()
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -80,6 +85,7 @@ func init() {
 	optionSwitch("insecure", "", "disable server certificate validation")
 	optionSwitch("json", "j", "select JSON output")
 	optionSwitch("verbose", "v", "enable diagnostic output")
+	optionSwitch("version", "", "print program name and version")
 	optionSwitch("quiet", "q", "suppress output")
 	optionSwitch("force", "", "enable destructive operations")
 	optionString("domain", "d", "", "CardDAV server domain")
@@ -90,7 +96,6 @@ func init() {
 	optionString("api-key", "", "", "bcc API key")
 	optionString("client-cert", "", "/etc/mabctl/mabctl.pem", "client certificate file")
 	optionString("client-key", "", "/etc/mabctl/mabctl.key", "client certificate key file")
-
 }
 
 func viperKey(name string) string {
