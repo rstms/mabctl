@@ -41,7 +41,7 @@ var cfgFile string
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "mabctl",
-	Version: "1.5.18",
+	Version: "1.5.19",
 	Short: "mabctl address book control tool library",
 	Long: `
 CLI toolkit for administering a baikal carddav/caldav server.
