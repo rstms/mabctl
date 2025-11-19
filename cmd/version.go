@@ -45,6 +45,6 @@ func init() {
 }
 
 func PrintVersion() {
-		fmt.Printf("mabctl version %s\n", Version)
+		fmt.Printf("mabctl version %s\n", rootCmd.Version)
 		os.Exit(0)
 }

@@ -32,8 +32,6 @@ import (
 	"strings"
 )
 
-const Version = "1.5.18"
-
 const ProgramName = "mabctl"
 
 var MAB *api.Controller
@@ -43,6 +41,7 @@ var cfgFile string
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "mabctl",
+	Version: "1.5.18",
 	Short: "mabctl address book control tool library",
 	Long: `
 CLI toolkit for administering a baikal carddav/caldav server.
@@ -55,13 +54,6 @@ CLI toolkit for administering a baikal carddav/caldav server.
 		var err error
 		MAB, err = api.NewAddressBookController()
 		cobra.CheckErr(err)
-	},
-	//PersistentPostRun: func(cmd *cobra.Command, args []string) {},
-	Run: func(cmd *cobra.Command, args []string) {
-	    if viper.GetBool("version") {
-		PrintVersion()
-	    }
-	    cmd.Usage()
 	},
 }
 
@@ -85,7 +77,6 @@ func init() {
 	optionSwitch("insecure", "", "disable server certificate validation")
 	optionSwitch("json", "j", "select JSON output")
 	optionSwitch("verbose", "v", "enable diagnostic output")
-	optionSwitch("version", "", "print program name and version")
 	optionSwitch("quiet", "q", "suppress output")
 	optionSwitch("force", "", "enable destructive operations")
 	optionString("domain", "d", "", "CardDAV server domain")
