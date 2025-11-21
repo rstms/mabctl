@@ -1,4 +1,3 @@
 # mabctl
 
-MABCTL address book controller
-
+rstms mailserver address book management module and cli
