@@ -11,21 +11,25 @@ func ParseBookToken(username, token string) (string, string, error) {
 	if token == "default" {
 		return username, "Default Address Book", nil
 	}
-	fields := strings.SplitN(token, "-", 4)
-	if len(fields) == 4 {
-		username := fields[0] + "@" + fields[1] + "." + fields[2]
-		token = fields[3]
-		return username, token, nil
+
+	prefix := tokenize(username) + "-"
+	if strings.HasPrefix(token, prefix) {
+		book := token[len(prefix):]
+		return username, book, nil
 	}
 	return "", "", fmt.Errorf("unexpected token format: %s", token)
 }
+
 
 // return book token from username, bookname
 func BookToken(username, bookname string) string {
 	if strings.ToLower(bookname) == "default address book" {
 		return "default"
 	}
-	raw := username + "-" + bookname
+	return tokenize(username + "-" + bookname)
+}
+
+func tokenize(raw string) string {
 	token := ""
 	for _, char := range raw {
 		if unicode.IsUpper(char) {

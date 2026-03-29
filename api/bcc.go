@@ -471,10 +471,14 @@ func (c *Controller) GetBooks(username string) (*BooksResponse, error) {
 	return &response, nil
 }
 
-func (c *Controller) convertBook(dav *davapi.CardClient, davBook *carddav.AddressBook, detailed bool) (*Book, error) {
-	username, bookname, token, err := util.ParseBookPath(davBook.Path)
+func (c *Controller) convertBook(username string, dav *davapi.CardClient, davBook *carddav.AddressBook, detailed bool) (*Book, error) {
+
+	parsedUsername, bookname, token, err := util.ParseBookPath(davBook.Path)
 	if err != nil {
 		return nil, err
+	}
+	if username != parsedUsername {
+		return nil, util.Fatalf("convertBook parsed username mismatch: username=%s, parsed=%s", username, parsedUsername)
 	}
 	book := Book{
 		UserName:    username,
@@ -605,8 +609,11 @@ func (c *Controller) QueryAddress(username, bookname, email string) (*AddressRes
 
 // return books containing address
 func (c *Controller) ScanAddress(username, email string) (*BooksResponse, error) {
+
+	log.Printf("ScanAddress username=%s email=%s\n", username, email)
+
 	response := BooksResponse{}
-	response.Success = true
+	response.Success = false
 	response.Request = fmt.Sprintf("Scan books for CardDAV address: %s", email)
 
 	dav, err := c.davClient(username)
@@ -616,14 +623,14 @@ func (c *Controller) ScanAddress(username, email string) (*BooksResponse, error)
 	}
 	books, err := dav.ScanAddress(email)
 	if err != nil {
-		response.Success = false
 		response.Message = fmt.Sprintf("%v", err)
 		return &response, nil
 	}
+
 	response.Message = fmt.Sprintf("books found: %d", len(*books))
 	response.Books = make([]Book, len(*books))
 	for i, davBook := range *books {
-		book, err := c.convertBook(dav, &davBook, false)
+		book, err := c.convertBook(username, dav, &davBook, false)
 		if err != nil {
 			response.Success = false
 			response.Message = fmt.Sprintf("%v", err)
